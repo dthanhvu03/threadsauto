@@ -189,6 +189,7 @@ class GitCLI:
                 capture_output=capture_output,
                 text=True,
                 encoding='utf-8',
+                errors='replace',  # Replace invalid UTF-8 characters instead of raising error
                 timeout=300,  # 5 minutes timeout
                 env=env
             )
@@ -203,12 +204,27 @@ class GitCLI:
                 f.write(json.dumps({"location": "git_cli.py:198", "message": "_run_git_command: CalledProcessError", "data": {"has_stderr": bool(e.stderr), "has_stdout": bool(e.stdout), "stderr_preview": str(e.stderr)[:200] if e.stderr else None, "stdout_preview": str(e.stdout)[:200] if e.stdout else None, "capture_output": capture_output}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A,B"}) + "\n")
             # #endregion
             # Get error message from stderr, stdout, or exception
+            # Handle encoding errors gracefully
             error_msg = ""
-            if e.stderr:
-                error_msg += e.stderr
-            if e.stdout:
-                # Always include stdout if available, not just for Permission denied
-                error_msg += " " + e.stdout
+            try:
+                if e.stderr:
+                    error_msg += e.stderr
+                if e.stdout:
+                    # Always include stdout if available, not just for Permission denied
+                    error_msg += " " + e.stdout
+            except (UnicodeDecodeError, UnicodeError):
+                # If encoding error, try to decode with errors='replace'
+                try:
+                    if e.stderr:
+                        error_msg += e.stderr.decode('utf-8', errors='replace')
+                    if e.stdout:
+                        error_msg += " " + e.stdout.decode('utf-8', errors='replace')
+                except (AttributeError, TypeError):
+                    # If already string or other issue, use str() with error handling
+                    if e.stderr:
+                        error_msg += str(e.stderr)
+                    if e.stdout:
+                        error_msg += " " + str(e.stdout)
             if not error_msg:
                 error_msg = str(e)
             # #region agent log
