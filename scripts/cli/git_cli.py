@@ -990,6 +990,330 @@ class GitCLI:
         print(f"Repository đã được setup và push lên {remote_name}/{branch}")
 
 
+# ============ INTERACTIVE MENU SYSTEM ============
+
+def prompt_input(prompt: str, default: Optional[str] = None) -> str:
+    """
+    Prompt for user input with optional default.
+    
+    Args:
+        prompt: Prompt message
+        default: Default value if user presses Enter
+    
+    Returns:
+        User input or default value
+    """
+    if default:
+        full_prompt = f"{prompt} (default: {default}): "
+    else:
+        full_prompt = f"{prompt}: "
+    
+    try:
+        user_input = input(full_prompt).strip()
+        return user_input if user_input else (default or "")
+    except (KeyboardInterrupt, EOFError):
+        print("\n\n⚠️  Đã hủy bởi user")
+        sys.exit(0)
+
+
+def prompt_yes_no(prompt: str, default: bool = False) -> bool:
+    """
+    Prompt for yes/no question.
+    
+    Args:
+        prompt: Prompt message
+        default: Default value (True for yes, False for no)
+    
+    Returns:
+        True if yes, False if no
+    """
+    default_str = "Y/n" if default else "y/N"
+    response = prompt_input(f"{prompt} ({default_str})", default="y" if default else "n")
+    return response.lower() in ["y", "yes"]
+
+
+def show_basic_menu(cli: GitCLI) -> None:
+    """Display basic operations menu."""
+    while True:
+        print_header("📋 BASIC OPERATIONS")
+        print("1. Status")
+        print("2. Add files")
+        print("3. Commit")
+        print("0. Back to main menu")
+        
+        choice = prompt_input("\nChọn option (0-3)")
+        
+        if choice == "0":
+            break
+        elif choice == "1":
+            try:
+                cli.status()
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        elif choice == "2":
+            try:
+                add_choice = prompt_yes_no("Add tất cả files?", default=True)
+                if add_choice:
+                    cli.add(all_files=True)
+                else:
+                    files_input = prompt_input("Nhập danh sách files (cách nhau bởi dấu cách)")
+                    if files_input:
+                        files = files_input.split()
+                        cli.add(files=files)
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        elif choice == "3":
+            try:
+                message = prompt_input("Commit message")
+                if message:
+                    cli.commit(message)
+                else:
+                    print("⚠️  Commit message không được để trống")
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        else:
+            print("❌ Lựa chọn không hợp lệ. Vui lòng chọn lại.")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+
+
+def show_push_pull_menu(cli: GitCLI) -> None:
+    """Display push/pull operations menu."""
+    while True:
+        print_header("📋 PUSH/PULL OPERATIONS")
+        print("1. Push")
+        print("2. Pull")
+        print("3. Quick Push (add + commit + push)")
+        print("0. Back to main menu")
+        
+        choice = prompt_input("\nChọn option (0-3)")
+        
+        if choice == "0":
+            break
+        elif choice == "1":
+            try:
+                remote = prompt_input("Remote name", default="origin")
+                branch = prompt_input("Branch name (Enter để dùng current branch)", default="")
+                force = prompt_yes_no("Force push?", default=False)
+                set_upstream = prompt_yes_no("Set upstream?", default=False)
+                cli.push(
+                    remote=remote or "origin",
+                    branch=branch if branch else None,
+                    force=force,
+                    set_upstream=set_upstream
+                )
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        elif choice == "2":
+            try:
+                remote = prompt_input("Remote name", default="origin")
+                branch = prompt_input("Branch name (Enter để dùng current branch)", default="")
+                rebase = prompt_yes_no("Use rebase instead of merge?", default=False)
+                cli.pull(
+                    remote=remote or "origin",
+                    branch=branch if branch else None,
+                    rebase=rebase
+                )
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        elif choice == "3":
+            try:
+                message = prompt_input("Commit message")
+                if not message:
+                    print("⚠️  Commit message không được để trống")
+                else:
+                    remote = prompt_input("Remote name", default="origin")
+                    branch = prompt_input("Branch name (Enter để dùng current branch)", default="")
+                    force = prompt_yes_no("Force push?", default=False)
+                    no_verify = prompt_yes_no("Skip hooks (--no-verify)?", default=False)
+                    cli.quick_push(
+                        message=message,
+                        remote=remote or "origin",
+                        branch=branch if branch else None,
+                        force=force,
+                        no_verify=no_verify
+                    )
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        else:
+            print("❌ Lựa chọn không hợp lệ. Vui lòng chọn lại.")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+
+
+def show_setup_menu(cli: GitCLI) -> None:
+    """Display setup operations menu."""
+    while True:
+        print_header("📋 SETUP OPERATIONS")
+        print("1. Init repository")
+        print("2. Setup remote")
+        print("3. Complete setup (init + remote + commit + push)")
+        print("0. Back to main menu")
+        
+        choice = prompt_input("\nChọn option (0-3)")
+        
+        if choice == "0":
+            break
+        elif choice == "1":
+            try:
+                cli.init()
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        elif choice == "2":
+            try:
+                url = prompt_input("Remote repository URL (e.g., https://github.com/user/repo.git)")
+                if not url:
+                    print("⚠️  URL không được để trống")
+                else:
+                    name = prompt_input("Remote name", default="origin")
+                    force = prompt_yes_no("Force update if remote exists?", default=False)
+                    use_ssh = prompt_yes_no("Convert HTTPS URL to SSH format?", default=False)
+                    cli.setup_remote(
+                        url=url,
+                        name=name or "origin",
+                        force=force,
+                        use_ssh=use_ssh
+                    )
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        elif choice == "3":
+            try:
+                remote_url = prompt_input("Remote repository URL (e.g., https://github.com/user/repo.git)")
+                if not remote_url:
+                    print("⚠️  URL không được để trống")
+                else:
+                    commit_message = prompt_input("Initial commit message", default="Initial commit")
+                    remote_name = prompt_input("Remote name", default="origin")
+                    branch = prompt_input("Branch name", default="main")
+                    cli.setup(
+                        remote_url=remote_url,
+                        commit_message=commit_message or "Initial commit",
+                        remote_name=remote_name or "origin",
+                        branch=branch or "main"
+                    )
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        else:
+            print("❌ Lựa chọn không hợp lệ. Vui lòng chọn lại.")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+
+
+def show_advanced_menu(cli: GitCLI) -> None:
+    """Display advanced operations menu."""
+    while True:
+        print_header("📋 ADVANCED OPERATIONS")
+        print("1. Status (short format)")
+        print("2. Add specific files")
+        print("3. Commit with options")
+        print("4. Push with options")
+        print("5. Pull with options")
+        print("0. Back to main menu")
+        
+        choice = prompt_input("\nChọn option (0-5)")
+        
+        if choice == "0":
+            break
+        elif choice == "1":
+            try:
+                cli.status(short=True)
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        elif choice == "2":
+            try:
+                files_input = prompt_input("Nhập danh sách files (cách nhau bởi dấu cách)")
+                if files_input:
+                    files = files_input.split()
+                    cli.add(files=files)
+                else:
+                    print("⚠️  Cần nhập ít nhất một file")
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        elif choice == "3":
+            try:
+                message = prompt_input("Commit message")
+                if not message:
+                    print("⚠️  Commit message không được để trống")
+                else:
+                    allow_empty = prompt_yes_no("Allow empty commit?", default=False)
+                    no_verify = prompt_yes_no("Skip hooks (--no-verify)?", default=False)
+                    cli.commit(
+                        message=message,
+                        allow_empty=allow_empty,
+                        no_verify=no_verify
+                    )
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        elif choice == "4":
+            try:
+                remote = prompt_input("Remote name", default="origin")
+                branch = prompt_input("Branch name (Enter để dùng current branch)", default="")
+                force = prompt_yes_no("Force push?", default=False)
+                set_upstream = prompt_yes_no("Set upstream?", default=False)
+                cli.push(
+                    remote=remote or "origin",
+                    branch=branch if branch else None,
+                    force=force,
+                    set_upstream=set_upstream
+                )
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        elif choice == "5":
+            try:
+                remote = prompt_input("Remote name", default="origin")
+                branch = prompt_input("Branch name (Enter để dùng current branch)", default="")
+                rebase = prompt_yes_no("Use rebase instead of merge?", default=False)
+                cli.pull(
+                    remote=remote or "origin",
+                    branch=branch if branch else None,
+                    rebase=rebase
+                )
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        else:
+            print("❌ Lựa chọn không hợp lệ. Vui lòng chọn lại.")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+
+
+def show_main_menu(cli: GitCLI) -> None:
+    """Display main menu and handle navigation."""
+    while True:
+        print_header("📋 GIT CLI MENU")
+        print("1. Basic Operations (status, add, commit)")
+        print("2. Push/Pull Operations")
+        print("3. Setup Operations")
+        print("4. Advanced Operations")
+        print("0. Exit")
+        
+        choice = prompt_input("\nChọn option (0-4)")
+        
+        if choice == "0":
+            print("\n👋 Tạm biệt!")
+            break
+        elif choice == "1":
+            show_basic_menu(cli)
+        elif choice == "2":
+            show_push_pull_menu(cli)
+        elif choice == "3":
+            show_setup_menu(cli)
+        elif choice == "4":
+            show_advanced_menu(cli)
+        else:
+            print("❌ Lựa chọn không hợp lệ. Vui lòng chọn lại.")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -1003,6 +1327,12 @@ def main():
         type=Path,
         default=Path.cwd(),
         help="Path to git repository (default: current directory)"
+    )
+    
+    parser.add_argument(
+        '--menu',
+        action='store_true',
+        help='Show interactive menu (ignores other arguments)'
     )
     
     subparsers = parser.add_subparsers(dest='command', help='Commands')
@@ -1062,9 +1392,13 @@ def main():
     
     args = parser.parse_args()
     
-    if not args.command:
-        parser.print_help()
+    # If --menu flag or no command provided, show menu
+    if args.menu or not args.command:
+        cli = GitCLI(repo_path=args.repo, require_git=False)
+        show_main_menu(cli)
         return
+    
+    # Otherwise, execute command as before
     
     try:
         # Commands that don't require git repository

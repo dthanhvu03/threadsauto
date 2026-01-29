@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Threads Automation Tool
 
 Công cụ automation local để đăng nội dung Threads sử dụng Playwright.
@@ -12,6 +11,7 @@ Công cụ automation local để đăng nội dung Threads sử dụng Playwrig
 - ✅ **Structured Logging**: Log định dạng key-value để debug
 - ✅ **Post Scheduling**: Lên lịch đăng bài với priority và retry logic
 - ✅ **Excel Integration**: Đăng nhiều bài từ file Excel
+- ✅ **Git CLI Tool**: Interactive menu để quản lý Git operations dễ dàng
 - ✅ **Safety Guard**: Rate limiting và phát hiện trùng lặp (sẽ triển khai)
 
 ## Yêu cầu
@@ -44,6 +44,8 @@ playwright install chromium
 
 ## Sử dụng nhanh
 
+### Threads Automation
+
 ```bash
 # Đăng một thread
 python main.py --account account_01 --content "Xin chào Threads!"
@@ -57,6 +59,34 @@ python main.py --account account_01 --excel posts.xlsx
 # Chạy scheduler
 python main.py --scheduler --account account_01
 ```
+
+### Git CLI Tool
+
+```bash
+# Chạy interactive menu
+python scripts/cli/git_cli.py --menu
+# hoặc đơn giản
+python scripts/cli/git_cli.py
+
+# Hoặc sử dụng command-line arguments
+python scripts/cli/git_cli.py status
+python scripts/cli/git_cli.py add --all
+python scripts/cli/git_cli.py commit "My commit message"
+python scripts/cli/git_cli.py push
+
+# Quick push (add + commit + push)
+python scripts/cli/git_cli.py quick "My commit message"
+
+# Setup repository lần đầu
+python scripts/cli/git_cli.py setup https://github.com/user/repo.git
+```
+
+**Git CLI Features:**
+- 📋 **Interactive Menu**: Menu nhóm với 4 categories (Basic, Push/Pull, Setup, Advanced)
+- 🔧 **Auto Setup**: Tự động setup Git user config nếu chưa có
+- 🔐 **SSH Support**: Tự động setup SSH host keys cho GitHub
+- ⚠️ **Error Handling**: Xử lý các lỗi phổ biến (unrelated histories, merge conflicts, authentication)
+- 🚀 **Quick Push**: One-command để add, commit và push
 
 Xem [CLI_USAGE.md](docs/CLI_USAGE.md) để biết tất cả các commands.
 
@@ -96,8 +126,18 @@ Xem chi tiết trong [UI_USAGE.md](docs/UI_USAGE.md)
 
 ```
 threads_tool/
-├── main.py                 # Điểm vào chính (entry point)
-├── run_ui.sh              # Script chạy Streamlit UI
+├── main.py                 # Entry point chính
+├── scripts.py              # Scripts entry point
+├── setup.sh                # Setup script
+├── requirements.txt        # Python dependencies
+├── pytest.ini              # Pytest configuration
+├── LICENSE                 # License file
+├── DOCKER_README.md        # Docker documentation
+├── docker-compose.yml      # Docker Compose config
+├── docker-compose.dev.yml  # Docker Compose dev config
+├── docker-compose.prod.yml # Docker Compose prod config
+├── Dockerfile.backend      # Backend Dockerfile
+├── Dockerfile.frontend     # Frontend Dockerfile
 ├── cli/                    # CLI module
 │   ├── parser.py          # Argument parser
 │   └── commands/          # Command handlers
@@ -105,35 +145,108 @@ threads_tool/
 │       ├── jobs.py        # Job management commands
 │       ├── post.py        # Post thread command
 │       └── schedule.py    # Schedule & scheduler commands
-├── ui/                     # UI module (Streamlit)
-│   ├── streamlit_app.py   # Main Streamlit app
-│   └── api/               # API wrappers
-│       ├── jobs_api.py    # Jobs API wrapper
-│       └── accounts_api.py # Accounts API wrapper
-├── browser/
+├── scripts/               # Utility scripts
+│   ├── cli/               # CLI tools
+│   │   ├── git_cli.py     # Git CLI với interactive menu
+│   │   └── jobs_cli.py    # Jobs CLI
+│   ├── utility/           # Utility scripts
+│   │   ├── archive_old_jobs.py
+│   │   ├── cleanup_old_logs.py
+│   │   ├── fetch_all_metrics.py
+│   │   ├── sync_jobs_from_logs.py
+│   │   └── ...
+│   ├── test/              # Test scripts
+│   ├── analysis/          # Analysis scripts
+│   ├── check/             # Check scripts
+│   ├── cleanup/           # Cleanup scripts
+│   ├── debug/             # Debug scripts
+│   ├── archive/            # Archive scripts
+│   ├── backup/            # Backup scripts
+│   ├── migration/         # Migration scripts
+│   ├── sh/                # Shell scripts
+│   └── common.py          # Common utilities
+├── browser/               # Browser automation
 │   ├── manager.py         # Quản lý vòng đời browser
 │   └── login_guard.py     # Phát hiện trạng thái đăng nhập
-├── threads/
+├── threads/               # Threads automation
 │   ├── composer.py        # Đăng thread với anti-detection
 │   ├── verifier.py        # Xác minh đăng bài
 │   ├── types.py           # Types & constants
 │   ├── selectors.py       # UI selectors
 │   ├── behavior.py        # Anti-detection behavior
 │   └── ui_state.py        # UI state detection
-├── services/
+├── facebook/              # Facebook automation
+│   ├── composer.py        # Facebook post composer
+│   ├── navigation.py      # Navigation helpers
+│   ├── selectors.py       # UI selectors
+│   └── ...
+├── services/              # Shared services
 │   ├── logger.py          # Structured logging
 │   ├── scheduler.py       # Job scheduler
 │   └── exceptions.py     # Custom exceptions
-├── content/
+├── content/               # Content processing
 │   └── excel_loader.py    # Excel file loader
-├── config/
-│   └── config.py          # Quản lý cấu hình
-├── profiles/              # Browser profiles (mỗi account một profile)
-├── jobs/                  # Scheduled jobs (theo ngày)
-└── logs/                  # File log
+├── config/                # Configuration
+│   ├── config.py          # Main config
+│   ├── storage.py         # Storage config
+│   └── selectors_storage.py
+├── utils/                 # Utility modules
+│   └── ...
+├── backend/               # FastAPI backend
+│   ├── main.py            # FastAPI entry point
+│   ├── api/               # API layer
+│   │   ├── adapters/      # Data adapters
+│   │   ├── routes/        # API routes
+│   │   └── websocket/     # WebSocket support
+│   ├── app/               # Application layer
+│   │   ├── core/          # Core utilities
+│   │   ├── modules/       # Feature modules
+│   │   │   ├── accounts/  # Accounts module
+│   │   │   ├── jobs/      # Jobs module
+│   │   │   ├── scheduler/ # Scheduler module
+│   │   │   ├── excel/     # Excel module
+│   │   │   ├── dashboard/ # Dashboard module
+│   │   │   ├── config/    # Config module
+│   │   │   └── selectors/ # Selectors module
+│   │   └── shared/        # Shared base classes
+│   ├── app_flask/         # Flask alternative
+│   ├── tests/             # Backend tests
+│   └── utils/             # Backend utilities
+├── frontend/              # Vue.js frontend
+│   ├── src/
+│   │   ├── api/           # API clients
+│   │   ├── components/    # Vue components
+│   │   │   ├── common/    # Common components
+│   │   │   ├── dashboard/ # Dashboard components
+│   │   │   └── layout/    # Layout components
+│   │   ├── composables/   # Vue composables
+│   │   ├── core/          # Core utilities
+│   │   ├── features/      # Feature modules
+│   │   │   ├── accounts/  # Accounts feature
+│   │   │   ├── jobs/      # Jobs feature
+│   │   │   ├── scheduler/ # Scheduler feature
+│   │   │   ├── excel/     # Excel feature
+│   │   │   ├── dashboard/ # Dashboard feature
+│   │   │   ├── config/    # Config feature
+│   │   │   └── selectors/ # Selectors feature
+│   │   ├── router/        # Vue Router
+│   │   ├── stores/        # Pinia stores
+│   │   ├── utils/         # Utility functions
+│   │   └── views/         # Page views
+│   ├── tests/             # Frontend tests
+│   ├── package.json
+│   └── vite.config.js
+├── docker/                # Docker configurations
+│   └── mysql/             # MySQL config
+├── docs/                  # Documentation
+├── profiles/              # Browser profiles (runtime - mỗi account một profile)
+├── jobs/                  # Scheduled jobs (runtime - theo ngày)
+└── logs/                  # Log files (runtime)
 ```
 
-**Note:** Data directories (`logs/`, `profiles/`, `jobs/`) are runtime-only and excluded from repository. These directories are created automatically by the application and should not be committed to version control.
+**Note:** 
+- Data directories (`logs/`, `profiles/`, `jobs/`, `uploads/`) are runtime-only and excluded from repository. These directories are created automatically by the application and should not be committed to version control.
+- Docker support: Xem [DOCKER_README.md](DOCKER_README.md) để biết cách sử dụng Docker Compose cho development và production.
 
 ## Tài liệu
 
@@ -187,6 +300,36 @@ threads_tool/
 - Auto cleanup expired jobs (quá 24h)
 - Status tracking với detailed messages
 
+### Git CLI Tool (`scripts/cli/git_cli.py`)
+
+- **Interactive Menu System**:
+  - Main menu với 4 nhóm operations (Basic, Push/Pull, Setup, Advanced)
+  - Sub-menus cho từng nhóm với numbered options
+  - Prompt cho parameters khi cần
+  - Error handling với clear messages
+
+- **Auto Setup Features**:
+  - Tự động setup Git user config (`user.name`, `user.email`)
+  - Tự động setup SSH host keys cho GitHub
+  - Tự động convert HTTPS URLs sang SSH format (optional)
+
+- **Error Handling**:
+  - Xử lý "unrelated histories" với `--allow-unrelated-histories`
+  - Xử lý "divergent branches" với merge strategy
+  - Xử lý merge conflicts với hướng dẫn rõ ràng
+  - Xử lý authentication errors với hướng dẫn PAT/SSH setup
+
+- **Commands**:
+  - `status`: Xem git status
+  - `add`: Add files (--all hoặc specific files)
+  - `commit`: Commit với message
+  - `push`: Push lên remote
+  - `pull`: Pull từ remote với error handling
+  - `quick`: Quick push (add + commit + push)
+  - `init`: Khởi tạo git repository
+  - `setup-remote`: Setup remote repository
+  - `setup`: Complete setup (init + remote + commit + push)
+
 ## Cấu hình
 
 Chỉnh sửa `config/config.py` để điều chỉnh:
@@ -233,6 +376,3 @@ Module `services/` chỉ chứa **shared infrastructure**:
 ## License
 
 MIT
-=======
-# threadsauto
->>>>>>> b83771d7584c169a13409047f2c8a5c38e302b93
