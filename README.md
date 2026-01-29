@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Threads Automation Tool
 
 Công cụ automation local để đăng nội dung Threads sử dụng Playwright.
@@ -232,3 +233,6 @@ Module `services/` chỉ chứa **shared infrastructure**:
 ## License
 
 MIT
+=======
+# threadsauto
+>>>>>>> b83771d7584c169a13409047f2c8a5c38e302b93
