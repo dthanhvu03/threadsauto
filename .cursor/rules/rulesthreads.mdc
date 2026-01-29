@@ -1,0 +1,259 @@
+---
+alwaysApply: true
+---
+# SKILLS & MINDSET - Framework
+
+> **Related Files:**  
+> - `prompt.mdc` - Requirements to implement  
+> - `dev.mdc` - Best practices to apply  
+> - `code_standards.mdc` - Standards to follow  
+> - `qc.mdc` - Quality validation  
+> - `README.md` - Complete documentation
+
+---
+
+# KỸ NĂNG & TƯ DUY KỸ SƯ AUTOMATION TOOLS MXH (THREADS)
+
+> **Góc nhìn kỹ sư tools automation MXH (Threads)** – không phải marketer, không phải script kiddie  
+> Vai trò được cấu thành bởi **4 lớp năng lực + 1 lớp tư duy sống còn**
+
+---
+
+## I. TƯ DUY NỀN (FOUNDATION MINDSET) – SỐNG CÒN
+
+### 1. Automation ≠ Spam
+
+- **Automation là tối ưu thao tác người**
+- **Không phải "đánh nhanh – ăn sớm"**
+- **Ưu tiên trust account > tốc độ**
+
+### 2. Platform-first thinking
+
+- **Hiểu Threads là social product, không phải web form**
+- **Mỗi hành vi đều để lại footprint**
+- **Automation phải "đi theo UI evolution"**
+
+### 3. Fail-safe mindset
+
+- **Mọi action có thể fail**
+- **Không panic**
+- **Có retry – rollback – skip**
+
+---
+
+## II. TECH STACK & KỸ NĂNG CỐT LÕI
+
+### 1. Browser Automation (core skill)
+
+**Bắt buộc biết sâu:**
+- Playwright (ưu tiên) hoặc Selenium
+- Headed browser
+- User profile isolation
+
+**Phải hiểu:**
+- DOM động
+- Shadow DOM (Meta hay dùng)
+- Timing / race condition
+- Event loop UI
+
+> **👉 Không biết cái này = không phải kỹ sư automation.**
+
+### 2. Anti-detection & Behavior Simulation
+
+**Không phải bypass hack – mà là mimic người:**
+- Delay random
+- Typing theo chunk
+- Scroll trước khi click
+- Click không tuyệt đối chính giữa
+- Không lặp pattern
+
+> **👉 Kỹ sư automation giỏi không giống bot.**
+
+### 3. Threads-specific UI Understanding
+
+**Phải nắm:**
+- Flow tạo Thread
+- Flow reply / chain
+- Các trạng thái UI:
+  - loading
+  - disabled
+  - success
+  - shadow fail (bấm nhưng không post)
+
+**Biết rõ:**
+- Khi nào Threads "đăng không thành nhưng không báo lỗi"
+
+### 4. Content Engineering (không phải content writing)
+
+**Kỹ sư phải xử lý:**
+- Text length
+- Line break
+- Emoji encode
+- Hash content (tránh trùng)
+- Content = data (không phải = cảm xúc)
+
+### 5. Scheduler & Job System
+
+**Biết thiết kế:**
+- Job queue
+- Retry policy
+- Backoff
+- Dead job handling
+
+**❌ Không:**
+- setTimeout vô tội vạ
+- cron chạy mù
+
+---
+
+## III. HỆ THỐNG QUẢN LÝ (SYSTEM DESIGN)
+
+### 6. Account Management
+
+**Mỗi account cần:**
+- Profile browser riêng
+- Cookie persistence
+- Daily limit
+- Warm-up logic
+
+**Phải detect:**
+- Account cooldown
+- Soft-ban
+- UI restriction
+
+### 7. Safety & Risk Control
+
+**SafetyGuard cần:**
+- Rate limit
+- Content duplicate detection
+- Action spacing
+- Auto pause account
+
+> **👉 Đây là thứ 90% tool amateur không có.**
+
+### 8. Logging & Observability
+
+**Log không phải để "coi cho vui"**
+
+**Mà để:**
+- Debug UI change
+- Track ban risk
+- Phân tích pattern
+
+**Ví dụ log tốt:**
+```
+STEP=CLICK_POST_BTN RESULT=SUCCESS TIME=1.2s
+```
+
+---
+
+## IV. KỸ NĂNG PHỤ NHƯNG QUAN TRỌNG
+
+### 9. Reverse thinking (Platform defense)
+
+**Kỹ sư giỏi luôn hỏi:**
+- Nếu mình là Meta, mình detect bot thế nào?
+- Pattern nào dễ lộ?
+- Dấu hiệu nào nguy hiểm?
+
+### 10. Maintainability & Evolution
+
+- Selector versioning
+- Feature toggle
+- FAST_MODE / SAFE_MODE
+- Không hardcode business rule
+
+---
+
+## V. KHÁC BIỆT GIỮA SCRIPT KID & KỸ SƯ TOOLS
+
+| Tiêu chí | Script vặt | Kỹ sư automation |
+|----------|------------|------------------|
+| **Mục tiêu** | Chạy được | Chạy lâu |
+| **UI change** | Toang | Có fallback |
+| **Account** | Dùng xong bỏ | Nuôi lâu dài |
+| **Code** | Dính cứng | Modular |
+| **Logging** | Print | Structured log |
+
+---
+
+## VI. CHECKLIST THỰC HÀNH
+
+### ✅ Browser Automation
+- [ ] Sử dụng Playwright hoặc Selenium với headed browser
+- [ ] Isolate user profile cho mỗi account
+- [ ] Xử lý DOM động và Shadow DOM
+- [ ] Hiểu timing và race condition
+
+### ✅ Anti-detection
+- [ ] Random delay giữa các action
+- [ ] Typing theo chunk (không paste nguyên khối)
+- [ ] Scroll trước khi click
+- [ ] Click với offset ngẫu nhiên
+- [ ] Không lặp pattern hành vi
+
+### ✅ Threads UI Understanding
+- [ ] Map đầy đủ flow tạo Thread
+- [ ] Xử lý các trạng thái UI (loading, disabled, success, shadow fail)
+- [ ] Detect "đăng không thành nhưng không báo lỗi"
+
+### ✅ Content Engineering
+- [ ] Validate text length (Threads limit: 500 chars)
+- [ ] Xử lý line break và emoji encode
+- [ ] Hash content để tránh duplicate
+- [ ] Content được xử lý như data, không phải cảm xúc
+
+### ✅ Scheduler & Job System
+- [ ] Job queue với priority
+- [ ] Retry policy với exponential backoff
+- [ ] Dead job handling
+- [ ] Không dùng setTimeout vô tội vạ
+
+### ✅ Account Management
+- [ ] Profile browser riêng cho mỗi account
+- [ ] Cookie persistence
+- [ ] Daily limit tracking
+- [ ] Warm-up logic
+- [ ] Detect cooldown, soft-ban, UI restriction
+
+### ✅ Safety & Risk Control
+- [ ] Rate limit enforcement
+- [ ] Content duplicate detection
+- [ ] Action spacing (minimum delay)
+- [ ] Auto pause account khi có dấu hiệu nguy hiểm
+
+### ✅ Logging & Observability
+- [ ] Structured logging (JSON hoặc key-value format)
+- [ ] Log đầy đủ context: STEP, RESULT, TIME, ERROR
+- [ ] Track ban risk indicators
+- [ ] Phân tích pattern từ logs
+
+### ✅ Reverse Thinking
+- [ ] Hiểu cách Meta detect bot
+- [ ] Tránh pattern dễ lộ
+- [ ] Monitor dấu hiệu nguy hiểm
+
+### ✅ Maintainability
+- [ ] Selector versioning
+- [ ] Feature toggle (FAST_MODE / SAFE_MODE)
+- [ ] Không hardcode business rule
+- [ ] Code modular, dễ test và maintain
+
+---
+
+## VII. NGUYÊN TẮC VÀNG
+
+1. **Trust account > Tốc độ** – Account sống lâu quan trọng hơn post nhanh
+2. **Mimic người, không phải bypass** – Automation phải giống người dùng thật
+3. **Fail-safe mọi nơi** – Mọi action đều có thể fail, phải có retry/rollback
+4. **Platform-first** – Hiểu Threads là social product, không phải web form
+5. **Observability > Speed** – Log và monitor quan trọng hơn chạy nhanh
+6. **Modular > Monolithic** – Code phải dễ maintain và evolve
+7. **Safety > Features** – SafetyGuard quan trọng hơn tính năng mới
+
+---
+
+**Last Updated**: 2024  
+**Version**: 1.0.0  
+**Maintainer**: Engineering Team
+

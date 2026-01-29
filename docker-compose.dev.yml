@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: threads_backend_dev
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+      - PORT=8000
+      - LOG_LEVEL=debug
+    volumes:
+      - ./backend:/app/backend
+      - ./services:/app/services
+      - ./config:/app/config
+      - ./ui:/app/ui
+      - ./utils:/app/utils
+      - ./profiles:/app/profiles
+      - ./logs:/app/logs
+      - ./jobs:/app/jobs
+    env_file:
+      - .env
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    networks:
+      - threads_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      target: builder
+    container_name: threads_frontend_dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    working_dir: /app
+    command: npm run dev -- --host 0.0.0.0
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - threads_network
+
+networks:
+  threads_network:
+    driver: bridge

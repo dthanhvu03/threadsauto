@@ -1,0 +1,21 @@
+# Ignore unnecessary files in Docker context
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist/
+build/
+.git/
+.gitignore
+.env
+venv/
+env/
+*.log
+.DS_Store
+*.swp
+*.swo
+*~

@@ -1,0 +1,1040 @@
+---
+alwaysApply: true
+---
+# CODE STANDARDS & CONVENTIONS
+
+> **Related Files:**  
+> - `dev.mdc` - General development guidelines  
+> - `qc.mdc` - Review checklist & validation  
+> - `prompt.mdc` - Requirements context  
+> - `rulesthreads.mdc` - Code quality mindset  
+> - `README.md` - Complete documentation
+
+---
+
+> **Quy chuẩn code cho Threads Automation Tool**  
+> Coding standards, style guide, và conventions bắt buộc
+
+---
+
+## I. CODE STYLE (PEP 8)
+
+### 1. Indentation & Spacing
+
+**Indentation:**
+- Use 4 spaces (never tabs)
+- Maximum line length: 100 characters
+- Continuation lines: align with opening delimiter or use hanging indent
+
+```python
+# ✅ Good
+def function_name(
+    param1: str,
+    param2: int,
+    param3: Optional[Dict] = None
+) -> bool:
+    """Function docstring."""
+    pass
+
+# ❌ Bad
+def function_name(param1: str, param2: int, param3: Optional[Dict] = None) -> bool:
+    pass
+```
+
+**Spacing:**
+- One space around operators
+- No space before comma/semicolon
+- One space after comma/semicolon
+- No space around function arguments
+
+```python
+# ✅ Good
+result = a + b * c
+items = [1, 2, 3]
+function(arg1, arg2)
+
+# ❌ Bad
+result=a+b*c
+items = [ 1 , 2 , 3 ]
+function( arg1 , arg2 )
+```
+
+### 2. Blank Lines
+
+**Module Level:**
+- Two blank lines between top-level functions/classes
+- One blank line between methods in a class
+
+**Function Level:**
+- One blank line between logical sections
+- No blank line at start/end of function
+
+```python
+# ✅ Good
+import os
+from pathlib import Path
+
+
+class MyClass:
+    """Class docstring."""
+    
+    def method1(self):
+        """Method 1."""
+        pass
+    
+    def method2(self):
+        """Method 2."""
+        pass
+
+
+def function1():
+    """Function 1."""
+    pass
+
+
+def function2():
+    """Function 2."""
+    pass
+```
+
+---
+
+## II. NAMING CONVENTIONS
+
+### 1. Variables & Functions
+
+**snake_case:**
+- Variables: `account_id`, `max_posts`, `user_data_dir`
+- Functions: `get_browser()`, `process_content()`, `detect_ui_state()`
+- Private: `_internal_method()`, `__private_attribute`
+
+```python
+# ✅ Good
+account_id = "account_001"
+max_posts_per_day = 10
+user_data_directory = "./profiles"
+
+def get_browser_instance(account_id: str) -> Browser:
+    """Get browser instance."""
+    pass
+
+def _internal_helper():
+    """Private helper."""
+    pass
+
+# ❌ Bad
+accountId = "account_001"
+MaxPostsPerDay = 10
+getBrowserInstance()
+```
+
+### 2. Classes
+
+**PascalCase:**
+- Classes: `BrowserManager`, `ThreadComposer`, `SafetyGuard`
+- Exceptions: `LoginError`, `PostFailedError`, `TimeoutError`
+
+```python
+# ✅ Good
+class BrowserManager:
+    """Browser manager."""
+    pass
+
+class ThreadComposer:
+    """Thread composer."""
+    pass
+
+class LoginError(Exception):
+    """Login error."""
+    pass
+
+# ❌ Bad
+class browser_manager:
+    pass
+
+class threadComposer:
+    pass
+```
+
+### 3. Constants
+
+**UPPER_SNAKE_CASE:**
+- Constants: `MAX_POSTS`, `DEFAULT_TIMEOUT`, `THREADS_URL`
+- Module-level constants only
+
+```python
+# ✅ Good
+MAX_POSTS_PER_DAY = 10
+DEFAULT_TIMEOUT = 30000
+THREADS_BASE_URL = "https://www.threads.com/?hl=vi"
+
+# ❌ Bad
+maxPostsPerDay = 10
+default_timeout = 30000
+```
+
+### 4. Type Variables
+
+**PascalCase with single letter:**
+- Type variables: `T`, `K`, `V`, `E`
+- Generic types: `Dict[str, Any]`, `List[Optional[str]]`
+
+```python
+# ✅ Good
+from typing import TypeVar, Generic
+
+T = TypeVar('T')
+
+def process_items(items: List[T]) -> List[T]:
+    """Process items."""
+    pass
+
+# ❌ Bad
+def process_items(items: List[item]) -> List[item]:
+    pass
+```
+
+---
+
+## III. CODE STRUCTURE
+
+### 1. Module Organization
+
+**Order:**
+1. Module docstring
+2. `__future__` imports (if any)
+3. Standard library imports
+4. Third-party imports
+5. Local imports
+6. Constants
+7. Classes
+8. Functions
+9. `if __name__ == "__main__":`
+
+```python
+"""
+Module: browser/manager.py
+
+Browser manager for Threads automation.
+Handles browser lifecycle and profile management.
+"""
+
+# Standard library
+import asyncio
+from pathlib import Path
+from typing import Optional, Dict
+
+# Third-party
+from playwright.async_api import async_playwright, Browser, BrowserContext
+
+# Local
+from services.logger import StructuredLogger
+from config import Config
+
+# Constants
+DEFAULT_TIMEOUT = 30000
+MAX_RETRIES = 3
+
+# Classes
+class BrowserManager:
+    """Browser manager."""
+    pass
+
+# Functions
+def helper_function():
+    """Helper function."""
+    pass
+
+# Main
+if __name__ == "__main__":
+    pass
+```
+
+### 2. Class Structure
+
+**Order:**
+1. Class docstring
+2. Class variables
+3. `__init__` method
+4. Public methods
+5. Private methods
+6. Special methods (`__str__`, `__repr__`, etc.)
+
+```python
+class BrowserManager:
+    """
+    Browser manager for automation.
+    
+    Handles browser lifecycle, profile management,
+    and session persistence.
+    """
+    
+    # Class variables
+    DEFAULT_TIMEOUT = 30000
+    
+    def __init__(self, account_id: str):
+        """Initialize browser manager."""
+        self.account_id = account_id
+        self.browser: Optional[Browser] = None
+    
+    def start(self):
+        """Start browser."""
+        pass
+    
+    def close(self):
+        """Close browser."""
+        pass
+    
+    def _internal_method(self):
+        """Private method."""
+        pass
+    
+    def __str__(self) -> str:
+        """String representation."""
+        return f"BrowserManager(account={self.account_id})"
+```
+
+### 3. Function Structure
+
+**Order:**
+1. Function docstring
+2. Type hints
+3. Default parameters
+4. Body
+5. Return statement
+
+```python
+def process_content(
+    content: str,
+    max_length: int = 500,
+    check_duplicate: bool = True,
+    normalize: bool = True
+) -> Dict[str, Any]:
+    """
+    Process content with validation and duplicate check.
+    
+    Args:
+        content: Text content to process
+        max_length: Maximum allowed length (default: 500)
+        check_duplicate: Whether to check for duplicates
+        normalize: Whether to normalize content
+    
+    Returns:
+        Dict with processed content and metadata:
+        - processed: Normalized content
+        - hash: Content hash
+        - validation: Validation result
+        - is_duplicate: Whether content is duplicate
+    
+    Raises:
+        ValueError: If content is invalid
+    
+    Example:
+        >>> result = process_content("Hello Threads!")
+        >>> print(result['hash'])
+        'abc123...'
+    """
+    # Validation
+    if not content:
+        raise ValueError("Content cannot be empty")
+    
+    # Processing
+    processed = normalize_content(content) if normalize else content
+    
+    # Return
+    return {
+        "processed": processed,
+        "hash": hash_content(processed),
+        "validation": validate_length(processed, max_length),
+        "is_duplicate": check_duplicate and is_duplicate_content(processed)
+    }
+```
+
+---
+
+## IV. DOCUMENTATION STANDARDS
+
+### 1. Module Docstrings
+
+**Format:**
+```python
+"""
+Module: path/to/module.py
+
+Brief description of module purpose.
+
+Detailed description if needed.
+Explains key concepts, usage patterns, etc.
+"""
+```
+
+### 2. Class Docstrings
+
+**Format:**
+```python
+class BrowserManager:
+    """
+    Browser manager for automation.
+    
+    Handles browser lifecycle, profile management,
+    and session persistence.
+    
+    Attributes:
+        account_id: Account identifier
+        browser: Browser instance
+        page: Current page instance
+    
+    Example:
+        >>> manager = BrowserManager("account_001")
+        >>> await manager.start()
+        >>> await manager.navigate("https://www.threads.com/?hl=vi")
+        >>> await manager.close()
+    """
+    pass
+```
+
+### 3. Function Docstrings
+
+**Format (Google Style):**
+```python
+def process_content(
+    content: str,
+    max_length: int = 500
+) -> Dict[str, Any]:
+    """
+    Process content with validation and duplicate check.
+    
+    Args:
+        content: Text content to process. Must be non-empty.
+        max_length: Maximum allowed length. Defaults to 500.
+    
+    Returns:
+        Dict with processed content and metadata:
+        - processed: Normalized content string
+        - hash: SHA256 hash of content
+        - validation: ValidationResult object
+        - is_duplicate: Boolean indicating duplicate status
+    
+    Raises:
+        ValueError: If content is empty or None
+        ValidationError: If content exceeds max_length
+    
+    Example:
+        >>> result = process_content("Hello Threads!")
+        >>> assert result['is_duplicate'] is False
+        >>> print(result['hash'])
+        'abc123...'
+    """
+    pass
+```
+
+### 4. Inline Comments
+
+**Guidelines:**
+- Comment WHY, not HOW
+- Use clear, concise language
+- Update comments when code changes
+- Remove obsolete comments
+
+```python
+# ✅ Good: Explains why
+# Use random delay to avoid detection patterns
+# Meta's bot detection looks for consistent timing
+delay = random.uniform(0.5, 2.0)
+
+# ✅ Good: Explains complex logic
+# Check shadow fail: content still in input but no error shown
+# This happens when Threads silently rejects the post
+if content_in_input and not error_message and not success_indicator:
+    return PostResult(shadow_fail=True)
+
+# ❌ Bad: Explains obvious
+# Generate random number between 0.5 and 2.0
+delay = random.uniform(0.5, 2.0)
+
+# ❌ Bad: Obsolete comment
+# TODO: Fix this later (code already fixed)
+```
+
+---
+
+## V. TYPE HINTS
+
+### 1. Function Signatures
+
+**Always use type hints:**
+```python
+# ✅ Good
+def process_content(
+    content: str,
+    max_length: int = 500,
+    check_duplicate: bool = True
+) -> Dict[str, Any]:
+    pass
+
+# ❌ Bad
+def process_content(content, max_length=500, check_duplicate=True):
+    pass
+```
+
+### 2. Variable Type Hints
+
+**Use for complex types:**
+```python
+# ✅ Good
+from typing import Optional, Dict, List, Any
+
+account_id: str = "account_001"
+browser: Optional[Browser] = None
+results: Dict[str, Any] = {}
+items: List[str] = []
+
+# Simple types can be inferred
+count = 0  # int inferred
+name = "test"  # str inferred
+```
+
+### 3. Return Types
+
+**Always specify return type:**
+```python
+# ✅ Good
+def get_browser() -> Browser:
+    """Get browser instance."""
+    return self.browser
+
+def process_content() -> Dict[str, Any]:
+    """Process content."""
+    return {"result": "success"}
+
+def validate_input() -> bool:
+    """Validate input."""
+    return True
+
+# ❌ Bad
+def get_browser():
+    return self.browser
+
+def process_content():
+    return {"result": "success"}
+```
+
+### 4. Generic Types
+
+**Use typing module:**
+```python
+from typing import Optional, Dict, List, Any, Union, Callable
+
+# Optional
+browser: Optional[Browser] = None
+
+# Dict
+config: Dict[str, Any] = {}
+
+# List
+items: List[str] = []
+
+# Union
+value: Union[str, int] = "test"
+
+# Callable
+callback: Callable[[str], bool] = lambda x: True
+```
+
+---
+
+## VI. ERROR HANDLING CONVENTIONS
+
+### 1. Exception Types
+
+**Use specific exceptions:**
+```python
+# ✅ Good
+try:
+    await page.click(selector)
+except TimeoutError as e:
+    logger.log_error("Timeout clicking element", error=str(e))
+except ElementNotFoundError as e:
+    logger.log_error("Element not found", error=str(e))
+except Exception as e:
+    logger.log_error("Unexpected error", error=str(e))
+    raise
+
+# ❌ Bad
+try:
+    await page.click(selector)
+except:
+    pass  # Silent failure
+```
+
+### 2. Error Messages
+
+**Be descriptive:**
+```python
+# ✅ Good
+if not content:
+    raise ValueError("Content cannot be empty. Provide non-empty string.")
+
+if len(content) > MAX_LENGTH:
+    raise ValueError(
+        f"Content length {len(content)} exceeds maximum {MAX_LENGTH}."
+    )
+
+# ❌ Bad
+if not content:
+    raise ValueError("Invalid")
+
+if len(content) > MAX_LENGTH:
+    raise ValueError("Too long")
+```
+
+### 3. Error Logging
+
+**Always log errors:**
+```python
+# ✅ Good
+try:
+    result = await action()
+    logger.log_step(
+        step="ACTION_NAME",
+        result="SUCCESS",
+        account_id=self.account_id
+    )
+    return result
+except TimeoutError as e:
+    logger.log_step(
+        step="ACTION_NAME",
+        result="FAILED",
+        error=f"Timeout: {str(e)}",
+        account_id=self.account_id
+    )
+    raise
+except Exception as e:
+    logger.log_step(
+        step="ACTION_NAME",
+        result="ERROR",
+        error=f"Unexpected error: {str(e)}",
+        account_id=self.account_id
+    )
+    raise
+
+# ❌ Bad
+try:
+    result = await action()
+    return result
+except:
+    pass  # Silent failure, no logging
+```
+
+---
+
+## VII. LOGGING CONVENTIONS
+
+### 1. Log Format
+
+**Use structured logging:**
+```python
+# ✅ Good
+logger.log_step(
+    step="CLICK_POST_BTN",
+    result="SUCCESS",
+    time_ms=1200.5,
+    account_id="account_001",
+    thread_id="1234567890"
+)
+
+logger.log_step(
+    step="CREATE_THREAD",
+    result="FAILED",
+    time_ms=5000.0,
+    error="Timeout after 5s",
+    account_id="account_001",
+    risk_level="high"
+)
+
+# ❌ Bad
+print("Clicked button")
+print(f"Error: {error}")
+logger.info("Something happened")
+```
+
+### 2. Log Levels
+
+**Use appropriate levels:**
+```python
+# DEBUG: Detailed debugging info
+logger.debug("Element found at selector: %s", selector)
+
+# INFO: Normal operations
+logger.info("Browser started successfully")
+
+# WARNING: Potential issues
+logger.warning("Rate limit approaching: %d/%d", current, max_limit)
+
+# ERROR: Failures
+logger.error("Failed to post thread: %s", error_message)
+
+# CRITICAL: System-breaking issues
+logger.critical("Account banned, stopping automation")
+```
+
+### 3. Log Context
+
+**Always include context:**
+```python
+# ✅ Good
+logger.log_step(
+    step="ACTION_NAME",
+    result="SUCCESS",
+    account_id=self.account_id,
+    thread_id=thread_id,
+    content_hash=content_hash,
+    risk_level=risk_level
+)
+
+# ❌ Bad
+logger.log_step(step="ACTION_NAME", result="SUCCESS")
+```
+
+---
+
+## VIII. TESTING CONVENTIONS
+
+### 1. Test Naming
+
+**Use descriptive names:**
+```python
+# ✅ Good
+def test_browser_manager_starts_successfully():
+    """Test browser manager starts without errors."""
+    pass
+
+def test_content_validation_rejects_empty_string():
+    """Test content validation rejects empty string."""
+    pass
+
+def test_safety_guard_blocks_duplicate_content():
+    """Test safety guard blocks duplicate content."""
+    pass
+
+# ❌ Bad
+def test1():
+    pass
+
+def test_browser():
+    pass
+
+def test_content():
+    pass
+```
+
+### 2. Test Structure
+
+**Arrange-Act-Assert pattern:**
+```python
+@pytest.mark.asyncio
+async def test_post_thread_success():
+    """Test successful thread post."""
+    # Arrange
+    browser = await create_test_browser()
+    composer = ThreadComposer(browser.page)
+    content = "Test content"
+    
+    # Act
+    result = await composer.post_thread(content)
+    
+    # Assert
+    assert result.success is True
+    assert result.thread_id is not None
+    assert result.state == UIState.SUCCESS
+```
+
+### 3. Test Fixtures
+
+**Use fixtures for setup:**
+```python
+@pytest.fixture
+async def browser():
+    """Create test browser."""
+    browser = await create_test_browser()
+    yield browser
+    await browser.close()
+
+@pytest.fixture
+def mock_logger():
+    """Create mock logger."""
+    return Mock(spec=StructuredLogger)
+
+@pytest.mark.asyncio
+async def test_with_fixtures(browser, mock_logger):
+    """Test with fixtures."""
+    manager = BrowserManager(browser, mock_logger)
+    # Test code
+```
+
+---
+
+## IX. IMPORT CONVENTIONS
+
+### 1. Import Order
+
+**Follow PEP 8:**
+```python
+# 1. Standard library
+import asyncio
+import json
+from pathlib import Path
+from typing import Optional, Dict
+
+# 2. Third-party
+from playwright.async_api import Page, Browser
+import pytest
+
+# 3. Local
+from browser.manager import BrowserManager
+from threads.composer import ThreadComposer
+from services.logger import StructuredLogger
+```
+
+### 2. Import Style
+
+**Prefer specific imports:**
+```python
+# ✅ Good
+from playwright.async_api import Page, Browser, TimeoutError
+from typing import Optional, Dict, List
+
+# ❌ Bad (unless needed)
+from playwright.async_api import *
+from typing import *
+```
+
+### 3. Import Grouping
+
+**Group related imports:**
+```python
+# ✅ Good
+# Standard library - async
+import asyncio
+from asyncio import sleep
+
+# Standard library - typing
+from typing import Optional, Dict, List, Any
+
+# Standard library - path
+from pathlib import Path
+
+# Third-party - playwright
+from playwright.async_api import Page, Browser
+
+# Local - browser
+from browser.manager import BrowserManager
+
+# Local - threads
+from threads.composer import ThreadComposer
+```
+
+---
+
+## X. CODE ORGANIZATION
+
+### 1. File Structure
+
+**One class per file (when possible):**
+```
+browser/
+├── __init__.py
+├── manager.py      # BrowserManager class
+├── login_guard.py  # LoginGuard class
+└── utils.py        # Utility functions
+```
+
+### 2. Package Structure
+
+**Clear module boundaries:**
+```
+threads_tool/
+├── browser/        # Browser automation
+├── threads/        # Threads-specific logic
+├── services/       # Services (scheduler, safety)
+├── content/        # Content processing
+├── config/         # Configuration
+└── utils/          # Shared utilities
+```
+
+### 3. Function Length
+
+**Keep functions focused:**
+- Target: < 50 lines
+- Maximum: 100 lines
+- Split if function does multiple things
+
+```python
+# ✅ Good: Focused function
+def validate_content(content: str) -> bool:
+    """Validate content."""
+    if not content:
+        return False
+    if len(content) > MAX_LENGTH:
+        return False
+    return True
+
+# ❌ Bad: Too many responsibilities
+def process_and_post(content: str):
+    """Process content, validate, check duplicate, post, verify."""
+    # 200+ lines of code
+    pass
+```
+
+---
+
+## XI. FORBIDDEN PATTERNS
+
+### 1. Never Do
+
+**Anti-patterns to avoid:**
+```python
+# ❌ Bare except
+try:
+    action()
+except:
+    pass
+
+# ❌ Silent failures
+try:
+    action()
+except Exception:
+    pass  # No logging, no handling
+
+# ❌ Hardcoded values
+delay = 1.0
+max_posts = 10
+
+# ❌ Magic numbers
+if count > 5:
+    pass
+
+# ❌ Global state
+browser = None  # At module level
+
+# ❌ Mutable default arguments
+def function(items=[]):  # Use None instead
+    pass
+```
+
+### 2. Always Do
+
+**Best practices:**
+```python
+# ✅ Specific exceptions
+try:
+    action()
+except TimeoutError as e:
+    handle_timeout(e)
+
+# ✅ Proper error handling
+try:
+    action()
+except Exception as e:
+    logger.error("Action failed", error=str(e))
+    raise
+
+# ✅ Configuration values
+delay = config.anti_detection.min_delay
+max_posts = config.account.daily_posts
+
+# ✅ Named constants
+if count > MAX_RETRIES:
+    pass
+
+# ✅ Dependency injection
+def function(browser: Browser):
+    pass
+
+# ✅ Immutable defaults
+def function(items: Optional[List] = None):
+    if items is None:
+        items = []
+```
+
+---
+
+## XII. CODE REVIEW CHECKLIST
+
+### Must Have
+
+- [ ] Type hints on all functions
+- [ ] Docstrings on all public functions/classes
+- [ ] Error handling with logging
+- [ ] No hardcoded values
+- [ ] Tests written
+- [ ] Code follows PEP 8
+- [ ] No bare except clauses
+- [ ] Proper import organization
+
+### Should Have
+
+- [ ] Type hints on complex variables
+- [ ] Inline comments for complex logic
+- [ ] Error messages are descriptive
+- [ ] Functions are focused (< 50 lines)
+- [ ] No code duplication
+- [ ] Proper use of constants
+
+---
+
+## XIII. QUICK REFERENCE
+
+### Common Patterns
+
+```python
+# Type hints
+def function(param: str) -> bool:
+    pass
+
+# Optional
+value: Optional[str] = None
+
+# Dict/List
+items: List[str] = []
+config: Dict[str, Any] = {}
+
+# Async
+async def async_function() -> None:
+    await asyncio.sleep(1)
+
+# Context manager
+async with BrowserManager() as manager:
+    await manager.start()
+
+# Error handling
+try:
+    result = await action()
+except SpecificError as e:
+    logger.error("Action failed", error=str(e))
+    raise
+```
+
+### Common Constants
+
+```python
+# Timeouts
+DEFAULT_TIMEOUT = 30000
+SHORT_TIMEOUT = 5000
+LONG_TIMEOUT = 60000
+
+# Limits
+MAX_POSTS_PER_DAY = 10
+MAX_CONTENT_LENGTH = 500
+MAX_RETRIES = 3
+
+# URLs
+THREADS_BASE_URL = "https://www.threads.com/?hl=vi"
+THREADS_LOGIN_URL = "https://threads.net/login"
+```
+
+---
+
+**Last Updated:** 2024  
+**Version:** 1.0.0  
+**Maintainer:** Engineering Team

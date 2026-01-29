@@ -1,0 +1,14 @@
+# Cursor Rules Index
+
+This directory contains Cursor rules (`.mdc` files) that are automatically applied.
+
+## Files Overview
+
+1. **prompt.mdc** - Core requirements and objectives
+2. **rulesthreads.mdc** - Skills and mindset framework
+3. **dev.mdc** - Development guidelines and workflow
+4. **code_standards.mdc** - Detailed coding standards
+5. **qc.mdc** - Quality control and testing standards
+
+See `README.md` for detailed documentation and cross-references.
+

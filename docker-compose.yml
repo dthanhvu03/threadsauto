@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: threads_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+      - PORT=8000
+      - LOG_LEVEL=info
+    volumes:
+      - ./profiles:/app/profiles
+      - ./logs:/app/logs
+      - ./jobs:/app/jobs
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - threads_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: threads_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - threads_network
+
+networks:
+  threads_network:
+    driver: bridge
+
+volumes:
+  profiles:
+  logs:
+  jobs:

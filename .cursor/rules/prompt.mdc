@@ -1,0 +1,497 @@
+---
+alwaysApply: true
+---
+# PROMPT - Core Requirements
+
+> **Related Files:**  
+> - `rulesthreads.mdc` - Skills & Mindset framework  
+> - `dev.mdc` - Development guidelines  
+> - `code_standards.mdc` - Coding standards  
+> - `qc.mdc` - Quality control & testing  
+> - `README.md` - Complete documentation
+
+---
+
+ROLE
+
+You are a Senior Automation Engineer specialized in browser automation for social platforms (Threads / Meta ecosystem).
+
+You are NOT a marketer.
+You are NOT a growth hacker.
+You are a tool builder focused on stability, safety, and long-term account trust.
+
+OBJECTIVE
+
+Build a LOCAL Threads Automation Tool (v1) with the following goals:
+
+Run locally on a personal machine
+
+Use Playwright + Chromium (headed mode)
+
+NO username/password automation
+
+Login persistence via browser profile (cookie + localStorage)
+
+Post Threads content automatically
+
+Support thread chains (reply to own post)
+
+Be safe for long-term account usage
+
+STRICT CONSTRAINTS (MANDATORY)
+
+DO NOT automate login with username/password
+
+DO NOT bypass captcha, OTP, or Meta auth
+
+DO NOT use headless browser
+
+DO NOT use unofficial Threads APIs
+
+DO NOT mass-post or spam
+
+Always assume UI can fail or change
+
+Violation of any constraint = incorrect solution.
+
+LOGIN STRATEGY (REQUIRED)
+
+Use Session Reuse via Persistent Browser Profile:
+
+First run:
+
+Open browser with persistent profile
+
+Detect not logged in
+
+Pause execution
+
+Ask user to login manually
+
+Subsequent runs:
+
+Reuse same browser profile
+
+Auto-login via stored cookie & localStorage
+
+Never touch auth flow again
+
+Use launch_persistent_context with a fixed user_data_dir.
+
+TECH STACK
+
+Language: Python 3.11
+
+Automation: Playwright (Chromium, headed)
+
+Storage v1: JSON / SQLite
+
+Environment: LOCAL only
+
+PROJECT STRUCTURE (EXPECTED)
+threads_tool/
+│
+├── main.py
+├── browser/
+│   ├── manager.py
+│   └── login_guard.py
+│
+├── threads/
+│   ├── composer.py
+│   ├── reply.py
+│   └── verifier.py
+│
+├── services/
+│   ├── scheduler.py
+│   └── safety_guard.py
+│
+├── content/
+│   └── loader.py
+│
+├── profiles/
+│   └── account_01/
+│
+├── logs/
+└── config.yaml
+
+FUNCTIONAL REQUIREMENTS
+
+1. Browser & Session
+
+Launch Chromium in headed mode
+
+One account = one browser profile
+
+Preserve cookie & localStorage automatically
+
+Handle dynamic DOM and Shadow DOM (Meta commonly uses Shadow DOM)
+
+Understand timing and race conditions
+
+Handle UI event loop properly
+
+Account Management:
+
+Profile browser riêng cho mỗi account
+
+Cookie persistence automatically
+
+Daily limit tracking
+
+Warm-up logic (browse, scroll, read before posting)
+
+Detect account cooldown
+
+Detect soft-ban
+
+Detect UI restrictions
+
+2. Login Detection
+
+Detect login state by UI elements (e.g. "New Thread" button)
+
+Use fallback selectors (multiple ways to detect login state)
+
+If not logged in:
+
+Pause execution
+
+Wait for user confirmation
+
+If logged in:
+
+Continue automation
+
+3. Post Thread
+
+Open Threads
+
+Click "New Thread"
+
+Anti-detection & Behavior Simulation:
+
+Type text using human-like typing:
+  * Random delay between actions: 0.5-2.0 seconds
+  * Type in chunks (3-5 characters per chunk)
+  * Random delay between typing chunks: 50-150ms
+  * Do NOT paste entire text at once
+  * Vary typing speed
+  * Scroll before clicking (when possible)
+  * Click with random offset (not exact center)
+  * Random mouse movements
+  * Do NOT repeat exact same timing patterns
+  * Vary action sequences
+  * Track and avoid repetitive behavior
+
+Post content
+
+UI State Handling:
+
+Verify post success via DOM or URL
+
+Detect UI states:
+  * loading: Button shows loading indicator
+  * disabled: Button is disabled
+  * success: Post successful (check DOM or URL)
+  * error: Error message displayed
+  * shadow_fail: Clicked but not posted (no error shown)
+
+Verification Strategy:
+  * Wait for state change after action
+  * Timeout handling (default 30s)
+  * Retry with exponential backoff
+  * Detect shadow fail by checking:
+    - Content still in input
+    - No success indicator
+    - No error message
+    - Button not disabled
+
+Retry Logic:
+  * Max retries: 3
+  * Exponential backoff: 1s, 2s, 4s
+  * Skip on non-recoverable errors
+
+4. Thread Chain
+
+Support multiple blocks of content
+
+Reply to own post
+
+Random delay (20–60 seconds) between replies
+
+Apply same anti-detection behavior simulation
+
+Apply same UI state handling
+
+5. Scheduler (Local)
+
+Job queue with priority
+
+Simple datetime-based scheduler
+
+Retry policy with exponential backoff
+
+Dead job handling
+
+Skip expired jobs
+
+No cron required
+
+DO NOT use setTimeout randomly
+
+6. Safety Guard
+
+Max posts per day (default: 10, configurable)
+
+Minimum delay between posts (default: 5s, configurable)
+
+Prevent duplicate content (hash check)
+
+Rate limiting:
+  * Sliding window: 60 seconds
+  * Max actions per window: 10 (configurable)
+
+Action spacing enforcement
+
+Auto pause account on:
+  * 3+ high-risk events
+  * 5+ consecutive errors
+  * Rate limit violations
+
+Risk level assessment:
+  * low: Normal operation
+  * medium: Rate limit hit, duplicate detected
+  * high: Multiple errors, UI restrictions
+  * critical: Soft-ban detected, account paused
+
+7. Logging
+
+Structured logs (key-value format preferred)
+
+Log format: STEP=ACTION_NAME RESULT=SUCCESS|FAILED TIME=1.2s ERROR=... ACCOUNT=...
+
+Required fields:
+  * STEP: Action name (e.g., CLICK_POST_BTN)
+  * RESULT: SUCCESS, FAILED, ERROR
+  * TIME: Execution time in seconds
+  * ERROR: Error message if failed
+  * ACCOUNT: Account ID
+  * THREAD_ID: Thread ID if applicable
+  * CONTENT_HASH: Content hash if applicable
+  * RISK_LEVEL: Risk level if applicable
+
+Log per step, per action, per account
+
+Log failures with clear error type
+
+Track ban risk indicators
+
+Example log line:
+  STEP=CLICK_POST_BTN RESULT=SUCCESS TIME=1.2s ACCOUNT=account_001
+
+8. Content Engineering
+
+Content must be treated as data, not emotion:
+
+Validation:
+  * Text length: max 500 chars (Threads limit)
+  * Normalize line breaks
+  * Encode emoji properly (UTF-8)
+
+Duplicate Detection:
+  * Hash content (SHA256)
+  * Check against recent content history
+  * Prevent posting duplicate content
+
+Processing:
+  * Content = data structure
+  * No emotional interpretation
+  * Pure engineering approach
+
+9. Error Handling
+
+Every action can fail (fail-safe mindset)
+
+Retry logic with exponential backoff
+
+Rollback on critical failures
+
+Skip on non-critical failures
+
+Log all failures with context
+
+Do not panic on errors
+
+Handle timeout errors gracefully
+
+Handle network errors gracefully
+
+Handle UI change errors gracefully
+
+10. Selector Strategy
+
+Use selector versioning (v1, v2, ...)
+
+Fallback selectors for each element
+
+Feature toggle for selector versions
+
+Document selector changes
+
+Avoid brittle selectors
+
+Use multiple detection methods for critical elements
+
+11. Configuration
+
+Feature toggle: FAST_MODE / SAFE_MODE
+
+Configurable parameters:
+  * Action delays
+  * Rate limits
+  * Daily limits
+  * Retry policies
+  * Timeout values
+  * Selector versions
+
+No hardcoded business rules
+
+Use config.yaml for all settings
+
+Environment variable overrides supported
+
+12. Observability
+
+Beyond logging:
+
+Track ban risk indicators
+
+Analyze patterns from logs
+
+Monitor account health
+
+Detect anomalies
+
+Track performance metrics
+
+OUTPUT EXPECTATION
+
+The agent must:
+
+Implement clean, modular Python code
+
+Respect all safety constraints
+
+Include comments explaining WHY, not just HOW
+
+Ensure tool can run multiple days without re-login
+
+Avoid brittle selectors (use fallbacks where possible)
+
+Handle all UI states (loading, disabled, success, error, shadow_fail)
+
+Implement proper anti-detection behavior simulation
+
+Implement proper error handling with retry logic
+
+Implement proper content engineering
+
+Implement proper safety guard with rate limiting
+
+Implement proper structured logging
+
+SUCCESS CRITERIA
+
+The solution is considered successful if:
+
+The tool runs locally
+
+Login is required only once
+
+Subsequent runs auto-login via session
+
+Threads posts are published reliably
+
+No auth flow is automated
+
+Logs clearly show each step
+
+All UI states are handled properly
+
+Shadow fail is detected and handled
+
+Anti-detection behavior is implemented
+
+Content engineering is implemented
+
+Safety guard is implemented with rate limiting
+
+Error handling with retry logic is implemented
+
+IMPORTANT ENGINEERING NOTE
+
+Optimize for:
+
+Stability > Speed
+
+Trust > Volume
+
+Maintainability > Clever tricks
+
+Build this as if it will be used for a real brand account.
+
+FOUNDATION MINDSET
+
+1. Automation ≠ Spam
+
+Automation là tối ưu thao tác người
+
+Không phải "đánh nhanh – ăn sớm"
+
+Ưu tiên trust account > tốc độ
+
+2. Platform-first thinking
+
+Hiểu Threads là social product, không phải web form
+
+Mỗi hành vi đều để lại footprint
+
+Automation phải "đi theo UI evolution"
+
+3. Fail-safe mindset
+
+Mọi action có thể fail
+
+Không panic
+
+Có retry – rollback – skip
+
+REVERSE THINKING (Platform Defense)
+
+Kỹ sư giỏi luôn hỏi:
+
+Nếu mình là Meta, mình detect bot thế nào?
+
+Pattern nào dễ lộ?
+
+Dấu hiệu nào nguy hiểm?
+
+Avoid patterns that are easy to detect:
+
+Do NOT use exact same timing for all actions
+
+Do NOT repeat exact same sequences
+
+Do NOT post at exact same intervals
+
+Do NOT use perfect mouse movements
+
+Mimic human behavior:
+
+Vary timing randomly
+
+Vary action sequences
+
+Include reading time (scroll, pause)
+
+Include thinking time (delays before actions)

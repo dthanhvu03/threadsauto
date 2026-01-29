@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Backend
+backend/__pycache__/
+backend/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+build/
+dist/
+
+# Environment
+.env
+.env.local
+
+# Uploads
+uploads/
+*.xlsx
+*.xls
+
+# Data directories (runtime-only, not in repository)
+backups/
+uploadexcel/
+profiles/
+jobs/
+
+# Documentation (keep only README.md)
+*.md
+!README.md
+
+# Shell scripts
+*.sh
+
+# Test files
+test_*.py
+*_test.py
+tests/
+backend/tests/
+scripts/test/

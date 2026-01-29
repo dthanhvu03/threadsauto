@@ -1,0 +1,878 @@
+---
+alwaysApply: true
+---
+# DEVELOPMENT GUIDELINES
+
+> **Related Files:**  
+> - `prompt.mdc` - Requirements to implement  
+> - `rulesthreads.mdc` - Skills to apply  
+> - `code_standards.mdc` - Detailed coding standards  
+> - `qc.mdc` - Testing approach  
+> - `README.md` - Complete documentation
+
+---
+
+> **Developer Rules cho Threads Automation Tool**  
+> Best practices, coding standards, và development workflow
+
+---
+
+## I. DEVELOPMENT WORKFLOW
+
+### 1. Setup Environment
+
+**Prerequisites:**
+- Python 3.11+
+- Playwright installed
+- Chromium browser installed
+- Git configured
+
+**Initial Setup:**
+```bash
+# Clone repository
+git clone <repo-url>
+cd threads_tool
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate  # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install Playwright browsers
+playwright install chromium
+
+# Setup profiles directory
+mkdir -p profiles/account_01
+mkdir -p logs
+```
+
+**Environment Variables:**
+```bash
+# .env file
+RUN_MODE=SAFE  # or FAST
+SELECTOR_VERSION=v1
+CONFIG_FILE=config.yaml
+BROWSER_HEADLESS=false
+BROWSER_SLOW_MO=100
+```
+
+### 2. Development Process
+
+**Before Starting:**
+1. Read requirements from `prompt.mdc`
+2. Check existing code structure
+3. Review related modules
+4. Plan implementation approach
+
+**During Development:**
+1. Write code following standards
+2. Write tests alongside code
+3. Test locally frequently
+4. Commit small, logical changes
+5. Document as you code
+
+**Before Committing:**
+1. Run linters (pylint, black, mypy)
+2. Run tests (pytest)
+3. Check code coverage
+4. Review diff carefully
+5. Update documentation if needed
+
+### 3. Git Workflow
+
+**Branch Naming:**
+- `feature/description` - New features
+- `fix/description` - Bug fixes
+- `refactor/description` - Code refactoring
+- `test/description` - Test improvements
+- `docs/description` - Documentation
+
+**Commit Messages:**
+```
+type(scope): description
+
+Examples:
+feat(browser): add shadow DOM support
+fix(threads): handle shadow fail detection
+test(safety): add rate limit tests
+docs(readme): update setup instructions
+```
+
+**Commit Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `refactor`: Code refactoring
+- `test`: Test changes
+- `docs`: Documentation
+- `style`: Code style changes
+- `chore`: Maintenance tasks
+
+---
+
+## II. CODING STANDARDS
+
+### 1. Python Style Guide
+
+**Follow PEP 8:**
+- Use 4 spaces for indentation
+- Max line length: 100 characters
+- Use descriptive variable names
+- Use snake_case for functions/variables
+- Use PascalCase for classes
+- Use UPPER_CASE for constants
+
+**Imports:**
+```python
+# Standard library
+import asyncio
+import json
+from pathlib import Path
+from typing import Optional, Dict
+
+# Third-party
+from playwright.async_api import Page, Browser
+
+# Local
+from browser.manager import BrowserManager
+from threads.composer import ThreadComposer
+```
+
+**Type Hints:**
+```python
+def process_content(
+    content: str,
+    max_length: int = 500,
+    check_duplicate: bool = True
+) -> Dict[str, Any]:
+    """Process content with validation."""
+    pass
+```
+
+### 2. Code Organization
+
+**Module Structure:**
+```python
+"""
+Module docstring explaining purpose.
+"""
+# Standard library imports
+import asyncio
+from typing import Optional
+
+# Third-party imports
+from playwright.async_api import Page
+
+# Local imports
+from services.logger import StructuredLogger
+
+# Constants
+DEFAULT_TIMEOUT = 30000
+MAX_RETRIES = 3
+
+# Classes
+class MyClass:
+    """Class docstring."""
+    pass
+
+# Functions
+def my_function():
+    """Function docstring."""
+    pass
+```
+
+**Class Design:**
+- Single responsibility principle
+- Use composition over inheritance
+- Keep classes focused
+- Document public methods
+- Use private methods for internal logic
+
+### 3. Error Handling
+
+**Pattern:**
+```python
+async def safe_action(self, selector: str) -> bool:
+    """Perform action with error handling."""
+    try:
+        # Action logic
+        await self.page.click(selector)
+        return True
+    except TimeoutError as e:
+        self.logger.log_step(
+            step="CLICK_ELEMENT",
+            result="FAILED",
+            error=f"Timeout: {str(e)}",
+            account_id=self.account_id
+        )
+        return False
+    except Exception as e:
+        self.logger.log_step(
+            step="CLICK_ELEMENT",
+            result="ERROR",
+            error=f"Unexpected error: {str(e)}",
+            account_id=self.account_id
+        )
+        return False
+```
+
+**Error Types:**
+- `TimeoutError`: Timeout issues
+- `ValueError`: Invalid input
+- `KeyError`: Missing keys
+- `AttributeError`: Missing attributes
+- Custom exceptions for domain errors
+
+### 4. Logging
+
+**Always Log:**
+- Action start/end
+- Errors with context
+- State changes
+- Important decisions
+- Performance metrics
+
+**Log Format:**
+```python
+self.logger.log_step(
+    step="ACTION_NAME",
+    result="SUCCESS|FAILED",
+    time_ms=elapsed_time,
+    account_id=account_id,
+    thread_id=thread_id,
+    error=error_message,
+    risk_level=risk_level
+)
+```
+
+**Log Levels:**
+- `DEBUG`: Detailed debugging info
+- `INFO`: Normal operations
+- `WARNING`: Potential issues
+- `ERROR`: Failures
+- `CRITICAL`: System-breaking issues
+
+---
+
+## III. BEST PRACTICES
+
+### 1. Anti-detection Implementation
+
+**Always Use:**
+```python
+# Random delays
+await asyncio.sleep(random.uniform(0.5, 2.0))
+
+# Typing in chunks
+for chunk in chunks:
+    await element.type(chunk, delay=0)
+    await asyncio.sleep(random.uniform(0.05, 0.15))
+
+# Click with offset
+offset_x = random.randint(-5, 5)
+offset_y = random.randint(-5, 5)
+await element.click(offset={'x': offset_x, 'y': offset_y})
+
+# Scroll before click
+await element.scroll_into_view_if_needed()
+await asyncio.sleep(random.uniform(0.3, 0.6))
+```
+
+**Never Do:**
+- Exact same timing for all actions
+- Paste entire text at once
+- Click exact center
+- Repeat same patterns
+- No delays between actions
+
+### 2. UI State Handling
+
+**Always Check:**
+```python
+# Wait for element
+await page.wait_for_selector(selector, state="visible", timeout=10000)
+
+# Check state
+state = await detect_ui_state(page)
+if state == UIState.LOADING:
+    await wait_for_state_change(UIState.LOADING, UIState.SUCCESS)
+
+# Handle shadow fail
+if await check_shadow_fail(page):
+    # Retry or log
+    pass
+```
+
+**State Detection:**
+- Check loading state
+- Check disabled state
+- Check success state
+- Check error state
+- Check shadow fail
+
+### 3. Selector Strategy
+
+**Use Versioning:**
+```python
+SELECTORS = {
+    "v1": {
+        "compose_input": "div[contenteditable='true']",
+        "post_button": "button[type='submit']"
+    },
+    "v2": {
+        "compose_input": "textarea[placeholder*='Thread']",
+        "post_button": "button[aria-label*='Post']"
+    }
+}
+```
+
+**Use Fallbacks:**
+```python
+selectors = [
+    "button[type='submit']",
+    "button[aria-label*='Post']",
+    "button:has-text('Post')"
+]
+
+for selector in selectors:
+    try:
+        await page.click(selector)
+        break
+    except:
+        continue
+```
+
+### 4. Configuration
+
+**Never Hardcode:**
+```python
+# ❌ Bad
+delay = 1.0
+max_posts = 10
+
+# ✅ Good
+delay = config.anti_detection.min_delay
+max_posts = config.account.daily_posts
+```
+
+**Use Config:**
+```python
+from config import Config
+
+config = Config(mode=RunMode.SAFE)
+delay = config.anti_detection.min_delay
+rate_limit = config.safety.rate_limit_max
+```
+
+### 5. Testing
+
+**Write Tests:**
+```python
+# test_my_module.py
+import pytest
+from unittest.mock import Mock, patch
+
+@pytest.mark.asyncio
+async def test_my_function():
+    """Test my function."""
+    # Arrange
+    mock_page = Mock()
+    
+    # Act
+    result = await my_function(mock_page)
+    
+    # Assert
+    assert result is True
+```
+
+**Test Coverage:**
+- Happy paths
+- Error paths
+- Edge cases
+- Boundary conditions
+- Integration scenarios
+
+---
+
+## IV. COMMON PATTERNS
+
+### 1. Browser Automation Pattern
+
+```python
+class BrowserAutomation:
+    def __init__(self, account_id: str):
+        self.account_id = account_id
+        self.browser = None
+        self.page = None
+    
+    async def start(self):
+        """Start browser."""
+        self.browser = await playwright.chromium.launch(
+            headless=False,
+            slow_mo=100
+        )
+        self.page = await self.browser.new_page()
+    
+    async def close(self):
+        """Close browser."""
+        if self.browser:
+            await self.browser.close()
+    
+    async def __aenter__(self):
+        await self.start()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
+```
+
+### 2. Retry Pattern
+
+```python
+async def retry_action(
+    func: Callable,
+    max_retries: int = 3,
+    backoff: float = 1.0
+) -> Any:
+    """Retry action with exponential backoff."""
+    for attempt in range(max_retries):
+        try:
+            return await func()
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise
+            await asyncio.sleep(backoff * (2 ** attempt))
+    return None
+```
+
+### 3. State Machine Pattern
+
+```python
+class UIStateMachine:
+    def __init__(self):
+        self.state = UIState.UNKNOWN
+    
+    async def transition(self, new_state: UIState):
+        """Transition to new state."""
+        if self.is_valid_transition(self.state, new_state):
+            self.state = new_state
+        else:
+            raise InvalidTransitionError()
+```
+
+### 4. Observer Pattern (Logging)
+
+```python
+class ActionObserver:
+    def __init__(self, logger: StructuredLogger):
+        self.logger = logger
+    
+    def on_action_start(self, action: str):
+        """Called when action starts."""
+        self.logger.log_step(
+            step=f"{action}_START",
+            result="IN_PROGRESS"
+        )
+    
+    def on_action_end(self, action: str, success: bool):
+        """Called when action ends."""
+        self.logger.log_step(
+            step=f"{action}_END",
+            result="SUCCESS" if success else "FAILED"
+        )
+```
+
+---
+
+## V. DEBUGGING TIPS
+
+### 1. Browser Debugging
+
+**Enable Debug Mode:**
+```python
+browser = await playwright.chromium.launch(
+    headless=False,
+    slow_mo=500,  # Slow down for debugging
+    devtools=True  # Open DevTools
+)
+```
+
+**Take Screenshots:**
+```python
+await page.screenshot(path="debug.png")
+```
+
+**Console Logs:**
+```python
+page.on("console", lambda msg: print(f"Console: {msg.text}"))
+```
+
+### 2. Logging Debug
+
+**Enable Debug Logging:**
+```python
+logger = StructuredLogger(
+    name="threads_automation",
+    level=logging.DEBUG
+)
+```
+
+**Check Logs:**
+```bash
+tail -f logs/threads_automation_*.log
+grep "ERROR" logs/*.log
+```
+
+### 3. State Inspection
+
+**Inspect Page State:**
+```python
+# Check if element exists
+element = await page.query_selector(selector)
+if element:
+    text = await element.text_content()
+    print(f"Element text: {text}")
+
+# Check page URL
+url = page.url
+print(f"Current URL: {url}")
+
+# Check page title
+title = await page.title()
+print(f"Page title: {title}")
+```
+
+### 4. Network Debugging
+
+**Monitor Network:**
+```python
+page.on("request", lambda request: print(f"Request: {request.url}"))
+page.on("response", lambda response: print(f"Response: {response.status}"))
+```
+
+---
+
+## VI. PERFORMANCE OPTIMIZATION
+
+### 1. Browser Performance
+
+**Optimize Browser:**
+```python
+browser = await playwright.chromium.launch(
+    headless=False,
+    args=[
+        '--disable-blink-features=AutomationControlled',
+        '--disable-dev-shm-usage',
+        '--no-sandbox'
+    ]
+)
+```
+
+**Page Performance:**
+```python
+# Disable images for faster loading
+await page.route("**/*.{png,jpg,jpeg}", lambda route: route.abort())
+
+# Wait for specific elements only
+await page.wait_for_selector("main-content", timeout=10000)
+```
+
+### 2. Code Performance
+
+**Async Best Practices:**
+```python
+# ✅ Good: Run in parallel
+results = await asyncio.gather(
+    task1(),
+    task2(),
+    task3()
+)
+
+# ❌ Bad: Sequential
+result1 = await task1()
+result2 = await task2()
+result3 = await task3()
+```
+
+**Memory Management:**
+```python
+# Clean up resources
+async def cleanup(self):
+    if self.browser:
+        await self.browser.close()
+    if self.page:
+        await self.page.close()
+```
+
+---
+
+## VII. SECURITY BEST PRACTICES
+
+### 1. Credentials
+
+**Never Hardcode:**
+```python
+# ❌ Bad
+username = "myuser"
+password = "mypass"
+
+# ✅ Good
+username = os.getenv("THREADS_USERNAME")
+password = os.getenv("THREADS_PASSWORD")
+```
+
+**Use Environment Variables:**
+```bash
+# .env file (never commit)
+THREADS_USERNAME=user
+THREADS_PASSWORD=pass
+```
+
+### 2. Profile Isolation
+
+**Isolate Profiles:**
+```python
+# Each account has separate profile
+user_data_dir = f"./profiles/{account_id}"
+context = await browser.new_context(
+    user_data_dir=user_data_dir
+)
+```
+
+### 3. Data Protection
+
+**Sanitize Logs:**
+```python
+# Don't log sensitive data
+def sanitize_log(data: Dict) -> Dict:
+    """Remove sensitive information."""
+    sanitized = data.copy()
+    sanitized.pop("password", None)
+    sanitized.pop("token", None)
+    return sanitized
+```
+
+---
+
+## VIII. DOCUMENTATION STANDARDS
+
+### 1. Code Documentation
+
+**Docstrings:**
+```python
+def process_content(
+    content: str,
+    max_length: int = 500
+) -> Dict[str, Any]:
+    """
+    Process content with validation and duplicate check.
+    
+    Args:
+        content: Text content to process
+        max_length: Maximum allowed length (default: 500)
+    
+    Returns:
+        Dict with processed content and metadata:
+        - processed: Normalized content
+        - hash: Content hash
+        - validation: Validation result
+        - is_duplicate: Whether content is duplicate
+    
+    Raises:
+        ValueError: If content is invalid
+    
+    Example:
+        >>> result = process_content("Hello Threads!")
+        >>> print(result['hash'])
+        'abc123...'
+    """
+    pass
+```
+
+### 2. README Updates
+
+**Always Update:**
+- Setup instructions
+- Configuration changes
+- New features
+- Breaking changes
+- Examples
+
+### 3. Code Comments
+
+**Comment WHY, not HOW:**
+```python
+# ✅ Good: Explains why
+# Use random delay to avoid detection patterns
+delay = random.uniform(0.5, 2.0)
+
+# ❌ Bad: Explains how (obvious)
+# Generate random number between 0.5 and 2.0
+delay = random.uniform(0.5, 2.0)
+```
+
+---
+
+## IX. COMMON MISTAKES TO AVOID
+
+### 1. Anti-detection Mistakes
+
+**Don't:**
+- Use exact same timing
+- Paste entire text
+- Click exact center
+- Skip delays
+- Repeat patterns
+
+**Do:**
+- Vary timing randomly
+- Type in chunks
+- Click with offset
+- Add delays
+- Avoid patterns
+
+### 2. Error Handling Mistakes
+
+**Don't:**
+- Use bare except
+- Ignore errors silently
+- Generic error messages
+- No logging
+
+**Do:**
+- Catch specific exceptions
+- Log all errors
+- Descriptive messages
+- Proper error handling
+
+### 3. Selector Mistakes
+
+**Don't:**
+- Use brittle selectors
+- No fallbacks
+- Hardcode selectors
+- No versioning
+
+**Do:**
+- Use stable selectors
+- Multiple fallbacks
+- Config-based selectors
+- Version selectors
+
+---
+
+## X. DEVELOPMENT CHECKLIST
+
+### Before Starting Feature
+
+- [ ] Read requirements from `prompt.mdc`
+- [ ] Check existing code
+- [ ] Plan implementation
+- [ ] Setup test environment
+- [ ] Create feature branch
+
+### During Development
+
+- [ ] Follow coding standards
+- [ ] Write tests alongside code
+- [ ] Test locally frequently
+- [ ] Document as you code
+- [ ] Commit small changes
+
+### Before Committing
+
+- [ ] Run linters (pylint, black, mypy)
+- [ ] Run tests (pytest)
+- [ ] Check coverage
+- [ ] Review diff
+- [ ] Update docs
+
+### Before PR
+
+- [ ] All tests pass
+- [ ] Code reviewed
+- [ ] Documentation updated
+- [ ] No hardcoded values
+- [ ] Error handling complete
+- [ ] Logging added
+- [ ] Safety checks implemented
+
+---
+
+## XI. QUICK REFERENCE
+
+### Common Commands
+
+```bash
+# Run tests
+pytest tests/
+
+# Run with coverage
+pytest --cov=. --cov-report=html
+
+# Lint code
+pylint src/
+black src/
+mypy src/
+
+# Format code
+black src/
+
+# Type check
+mypy src/
+
+# Security check
+bandit -r src/
+```
+
+### Common Imports
+
+```python
+# Async
+import asyncio
+from asyncio import sleep
+
+# Playwright
+from playwright.async_api import async_playwright, Page, Browser
+
+# Type hints
+from typing import Optional, Dict, List, Any, Callable
+
+# Path handling
+from pathlib import Path
+
+# Logging
+import logging
+from services.logger import StructuredLogger
+
+# Config
+from config import Config, RunMode
+```
+
+### Common Patterns
+
+```python
+# Context manager
+async with BrowserAutomation(account_id) as browser:
+    await browser.navigate("https://www.threads.com/?hl=vi")
+
+# Retry with backoff
+for attempt in range(max_retries):
+    try:
+        return await action()
+    except Exception:
+        await asyncio.sleep(backoff * (2 ** attempt))
+
+# State check
+state = await detect_ui_state(page)
+if state == UIState.SUCCESS:
+    return True
+```
+
+---
+
+**Last Updated:** 2024  
+**Version:** 1.0.0  
+**Maintainer:** Engineering Team

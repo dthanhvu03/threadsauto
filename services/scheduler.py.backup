@@ -1,0 +1,1200 @@
+"""
+Module: services/scheduler.py
+
+Scheduler service cho Threads automation.
+Quản lý job queue với priority, datetime-based scheduling, và retry policy.
+"""
+
+# Standard library
+import asyncio
+import json
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+from enum import Enum
+from dataclasses import dataclass, asdict
+from uuid import uuid4
+
+# Local
+from services.logger import StructuredLogger
+from services.exceptions import (
+    SchedulerError,
+    JobNotFoundError,
+    InvalidScheduleTimeError,
+    StorageError
+)
+
+
+class JobStatus(Enum):
+    """Trạng thái của job."""
+    PENDING = "pending"
+    SCHEDULED = "scheduled"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+
+
+class JobPriority(Enum):
+    """Độ ưu tiên của job."""
+    LOW = 1
+    NORMAL = 2
+    HIGH = 3
+    URGENT = 4
+
+
+@dataclass
+class ScheduledJob:
+    """Job được lên lịch."""
+    job_id: str
+    account_id: str
+    content: str
+    scheduled_time: datetime
+    priority: JobPriority
+    status: JobStatus
+    max_retries: int = 3
+    retry_count: int = 0
+    created_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None  # Thời gian job bắt đầu chạy (khi status = RUNNING)
+    completed_at: Optional[datetime] = None
+    error: Optional[str] = None
+    thread_id: Optional[str] = None
+    status_message: Optional[str] = None  # Thông điệp trạng thái chi tiết
+    
+    def __post_init__(self):
+        """Khởi tạo sau khi tạo object."""
+        if self.created_at is None:
+            self.created_at = datetime.now()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Chuyển job thành dict để lưu."""
+        data = asdict(self)
+        # Convert datetime to ISO string
+        if isinstance(data['scheduled_time'], datetime):
+            data['scheduled_time'] = data['scheduled_time'].isoformat()
+        if isinstance(data['created_at'], datetime):
+            data['created_at'] = data['created_at'].isoformat()
+        if isinstance(data['completed_at'], datetime):
+            data['completed_at'] = data['completed_at'].isoformat()
+        if isinstance(data.get('started_at'), datetime):
+            data['started_at'] = data['started_at'].isoformat()
+        # Convert enums to values
+        data['priority'] = self.priority.value
+        data['status'] = self.status.value
+        return data
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'ScheduledJob':
+        """Tạo job từ dict."""
+        # Convert ISO string to datetime
+        if isinstance(data.get('scheduled_time'), str):
+            data['scheduled_time'] = datetime.fromisoformat(data['scheduled_time'])
+        if isinstance(data.get('created_at'), str):
+            data['created_at'] = datetime.fromisoformat(data['created_at'])
+        if isinstance(data.get('completed_at'), str):
+            data['completed_at'] = datetime.fromisoformat(data['completed_at'])
+        if isinstance(data.get('started_at'), str):
+            data['started_at'] = datetime.fromisoformat(data['started_at'])
+        # Convert values to enums
+        data['priority'] = JobPriority(data['priority'])
+        data['status'] = JobStatus(data['status'])
+        return cls(**data)
+    
+    def is_expired(self) -> bool:
+        """
+        Kiểm tra job đã hết hạn chưa.
+        
+        Job được coi là expired nếu:
+        - Đã quá 24 giờ kể từ scheduled_time
+        - VÀ job chưa được completed
+        """
+        # Chỉ coi là expired nếu đã quá 24h từ scheduled_time
+        # Và job chưa completed
+        if self.status == JobStatus.COMPLETED:
+            return False
+        return datetime.now() > self.scheduled_time + timedelta(hours=24)
+    
+    def is_ready(self) -> bool:
+        """Kiểm tra job đã sẵn sàng chạy chưa."""
+        is_ready = (
+            self.status == JobStatus.SCHEDULED and
+            datetime.now() >= self.scheduled_time and
+            not self.is_expired()
+        )
+        
+        # Cập nhật status message
+        if is_ready:
+            self.status_message = f"Sẵn sàng chạy - đã đến thời gian đăng ({self.scheduled_time.strftime('%Y-%m-%d %H:%M:%S')})"
+        elif self.status == JobStatus.SCHEDULED:
+            time_until = (self.scheduled_time - datetime.now()).total_seconds()
+            if time_until > 0:
+                minutes = int(time_until / 60)
+                self.status_message = f"Đang chờ - sẽ chạy sau {minutes} phút ({self.scheduled_time.strftime('%Y-%m-%d %H:%M:%S')})"
+            else:
+                self.status_message = "Đã quá thời gian nhưng chưa được chạy"
+        elif self.status == JobStatus.RUNNING:
+            self.status_message = "Đang chạy - đang đăng bài"
+        elif self.status == JobStatus.COMPLETED:
+            self.status_message = f"Hoàn thành - Thread ID: {self.thread_id or 'N/A'}"
+        elif self.status == JobStatus.FAILED:
+            self.status_message = f"Thất bại - {self.error or 'Không rõ lỗi'}"
+        elif self.status == JobStatus.EXPIRED:
+            self.status_message = "Hết hạn - đã quá 24h từ thời gian lên lịch"
+        
+        return is_ready
+    
+    def can_retry(self) -> bool:
+        """Kiểm tra job có thể retry không."""
+        return self.retry_count < self.max_retries
+    
+    def is_stuck(self, max_running_minutes: int = 30) -> bool:
+        """
+        Kiểm tra job có bị stuck không (đang RUNNING quá lâu).
+        
+        Args:
+            max_running_minutes: Số phút tối đa job có thể ở trạng thái RUNNING (mặc định: 30 phút)
+        
+        Returns:
+            True nếu job bị stuck (RUNNING quá lâu), False nếu không
+        """
+        if self.status != JobStatus.RUNNING:
+            return False
+        
+        # Nếu không có started_at, coi như stuck ngay lập tức
+        # (có thể là job cũ từ trước khi có field này, hoặc job bị crash ngay sau khi set RUNNING)
+        if not self.started_at:
+            # Nếu job RUNNING nhưng không có started_at, coi như stuck
+            # Vì không biết khi nào nó bắt đầu chạy
+            return True
+        
+        # Kiểm tra thời gian đã chạy
+        running_duration = datetime.now() - self.started_at
+        return running_duration > timedelta(minutes=max_running_minutes)
+
+
+class Scheduler:
+    """
+    Scheduler cho Threads automation.
+    
+    Quản lý job queue với:
+    - Priority-based scheduling
+    - Datetime-based execution
+    - Retry policy với exponential backoff
+    - Dead job handling
+    - Expired job skipping
+    """
+    
+    def __init__(
+        self,
+        storage_dir: Optional[Path] = None,
+        logger: Optional[StructuredLogger] = None
+    ):
+        """
+        Khởi tạo scheduler.
+        
+        Args:
+            storage_dir: Thư mục lưu jobs theo ngày (mặc định: ./jobs)
+            logger: Instance structured logger (tùy chọn)
+        """
+        self.storage_dir = storage_dir or Path("./jobs")
+        self.logger = logger or StructuredLogger(name="scheduler")
+        self.jobs: Dict[str, ScheduledJob] = {}
+        self.running = False
+        self._task: Optional[asyncio.Task] = None
+        
+        # Tạo thư mục storage nếu chưa có
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Load jobs từ tất cả các file
+        self._load_jobs()
+        
+        # Recover TẤT CẢ jobs RUNNING khi scheduler start (do crash/mất mạng)
+        # Không chỉ stuck > 30 phút, mà TẤT CẢ jobs RUNNING đều cần recover
+        self.recover_all_running_jobs()
+    
+    def _get_job_file_path(self, date: datetime) -> Path:
+        """
+        Lấy đường dẫn file job cho một ngày cụ thể.
+        
+        Args:
+            date: Ngày để lấy file path
+        
+        Returns:
+            Path đến file job: jobs/YYYY-MM-DD.json
+        """
+        date_str = date.strftime("%Y-%m-%d")
+        return self.storage_dir / f"jobs_{date_str}.json"
+    
+    def _get_all_job_files(self) -> List[Path]:
+        """
+        Lấy danh sách tất cả các file job.
+        
+        Returns:
+            List các Path đến các file job
+        """
+        if not self.storage_dir.exists():
+            return []
+        
+        # Tìm tất cả file jobs_YYYY-MM-DD.json
+        job_files = list(self.storage_dir.glob("jobs_*.json"))
+        # Sort theo tên file (sẽ sort theo ngày)
+        job_files.sort()
+        return job_files
+    
+    def _load_jobs(self) -> None:
+        """
+        Load jobs từ tất cả các file job theo ngày.
+        
+        Load từ các file jobs_YYYY-MM-DD.json trong storage_dir.
+        """
+        job_files = self._get_all_job_files()
+        
+        if not job_files:
+            self.logger.log_step(
+                step="LOAD_JOBS",
+                result="INFO",
+                note="No job files found, starting with empty job list",
+                storage_dir=str(self.storage_dir)
+            )
+            return
+        
+        loaded_count = 0
+        failed_count = 0
+        files_processed = 0
+        
+        for job_file in job_files:
+            try:
+                with open(job_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                    for job_data in data.get('jobs', []):
+                        try:
+                            job = ScheduledJob.from_dict(job_data)
+                            # Kiểm tra duplicate (có thể có job trong nhiều file)
+                            if job.job_id not in self.jobs:
+                                self.jobs[job.job_id] = job
+                                loaded_count += 1
+                            else:
+                                # Nếu duplicate, giữ job từ file mới hơn (theo tên file)
+                                self.logger.log_step(
+                                    step="LOAD_JOBS",
+                                    result="WARNING",
+                                    note=f"Duplicate job {job.job_id} found, keeping existing",
+                                    job_file=job_file.name
+                                )
+                        except (KeyError, ValueError, TypeError) as e:
+                            failed_count += 1
+                            self.logger.log_step(
+                                step="LOAD_JOBS",
+                                result="WARNING",
+                                error=f"Failed to load job {job_data.get('job_id', 'unknown')}: {str(e)}",
+                                error_type=type(e).__name__,
+                                job_file=job_file.name
+                            )
+                        except Exception as e:
+                            failed_count += 1
+                            self.logger.log_step(
+                                step="LOAD_JOBS",
+                                result="ERROR",
+                                error=f"Unexpected error loading job {job_data.get('job_id', 'unknown')}: {str(e)}",
+                                error_type=type(e).__name__,
+                                job_file=job_file.name
+                            )
+                
+                files_processed += 1
+                
+            except json.JSONDecodeError as e:
+                self.logger.log_step(
+                    step="LOAD_JOBS",
+                    result="ERROR",
+                    error=f"Invalid JSON in {job_file.name}: {str(e)}",
+                    error_type="JSONDecodeError"
+                )
+                continue
+            except PermissionError as e:
+                self.logger.log_step(
+                    step="LOAD_JOBS",
+                    result="ERROR",
+                    error=f"Permission denied reading {job_file.name}: {str(e)}",
+                    error_type="PermissionError"
+                )
+                continue
+            except Exception as e:
+                self.logger.log_step(
+                    step="LOAD_JOBS",
+                    result="ERROR",
+                    error=f"Failed to load {job_file.name}: {str(e)}",
+                    error_type=type(e).__name__
+                )
+                continue
+        
+        self.logger.log_step(
+            step="LOAD_JOBS",
+            result="SUCCESS",
+            jobs_count=len(self.jobs),
+            loaded_count=loaded_count,
+            failed_count=failed_count,
+            files_processed=files_processed,
+            storage_dir=str(self.storage_dir)
+        )
+    
+    def _save_jobs(self) -> None:
+        """
+        Lưu jobs vào các file theo ngày.
+        
+        Jobs được lưu vào file jobs_YYYY-MM-DD.json dựa trên scheduled_time của job.
+        Nếu job đã completed/expired, lưu vào file của ngày completed_at hoặc scheduled_time.
+        """
+        try:
+            # Nhóm jobs theo ngày (dựa trên scheduled_time)
+            jobs_by_date: Dict[str, List[ScheduledJob]] = {}
+            
+            for job in self.jobs.values():
+                # Xác định ngày để lưu job
+                # Ưu tiên: completed_at > scheduled_time > created_at
+                if job.completed_at:
+                    date_key = job.completed_at.strftime("%Y-%m-%d")
+                else:
+                    date_key = job.scheduled_time.strftime("%Y-%m-%d")
+                
+                if date_key not in jobs_by_date:
+                    jobs_by_date[date_key] = []
+                jobs_by_date[date_key].append(job)
+            
+            # Lưu từng file theo ngày
+            saved_files = 0
+            for date_key, jobs in jobs_by_date.items():
+                job_file_path = self._get_job_file_path(datetime.strptime(date_key, "%Y-%m-%d"))
+                
+                data = {
+                    'jobs': [job.to_dict() for job in jobs],
+                    'updated_at': datetime.now().isoformat(),
+                    'date': date_key
+                }
+                
+                # Write to temporary file first, then rename (atomic operation)
+                temp_path = job_file_path.with_suffix('.json.tmp')
+                try:
+                    with open(temp_path, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    
+                    # Atomic rename
+                    temp_path.replace(job_file_path)
+                    saved_files += 1
+                    
+                except PermissionError as e:
+                    self.logger.log_step(
+                        step="SAVE_JOBS",
+                        result="ERROR",
+                        error=f"Permission denied writing to {job_file_path}: {str(e)}",
+                        error_type="PermissionError",
+                        date=date_key
+                    )
+                    # Clean up temp file
+                    try:
+                        temp_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    raise StorageError(f"Permission denied writing to storage file {job_file_path}: {str(e)}") from e
+                except OSError as e:
+                    self.logger.log_step(
+                        step="SAVE_JOBS",
+                        result="ERROR",
+                        error=f"OS error writing to {job_file_path}: {str(e)}",
+                        error_type="OSError",
+                        date=date_key
+                    )
+                    # Clean up temp file
+                    try:
+                        temp_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    raise StorageError(f"OS error writing to storage file {job_file_path}: {str(e)}") from e
+            
+            # Cleanup các file rỗng (không còn jobs nào)
+            self._cleanup_empty_files(set(jobs_by_date.keys()))
+            
+            self.logger.log_step(
+                step="SAVE_JOBS",
+                result="SUCCESS",
+                jobs_count=len(self.jobs),
+                files_saved=saved_files,
+                dates=len(jobs_by_date)
+            )
+        except StorageError:
+            # Re-raise storage errors
+            raise
+        except Exception as e:
+            self.logger.log_step(
+                step="SAVE_JOBS",
+                result="ERROR",
+                error=f"Failed to save jobs: {str(e)}",
+                error_type=type(e).__name__
+            )
+            raise StorageError(f"Failed to save jobs: {str(e)}") from e
+    
+    def _cleanup_empty_files(self, active_dates: set) -> None:
+        """
+        Xóa các file job không còn jobs nào (đã cleanup hết).
+        
+        Args:
+            active_dates: Set các ngày hiện có jobs
+        """
+        all_files = self._get_all_job_files()
+        deleted_count = 0
+        
+        for job_file in all_files:
+            # Extract date từ tên file: jobs_YYYY-MM-DD.json
+            try:
+                date_str = job_file.stem.replace("jobs_", "")
+                datetime.strptime(date_str, "%Y-%m-%d")  # Validate format
+                
+                # Nếu file không thuộc active dates, kiểm tra xem có jobs không
+                if date_str not in active_dates:
+                    try:
+                        with open(job_file, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            jobs = data.get('jobs', [])
+                            # Chỉ xóa nếu file rỗng hoặc chỉ có completed/expired jobs cũ
+                            if not jobs:
+                                job_file.unlink()
+                                deleted_count += 1
+                                self.logger.log_step(
+                                    step="CLEANUP_EMPTY_FILES",
+                                    result="SUCCESS",
+                                    deleted_file=job_file.name
+                                )
+                    except Exception:
+                        # Không thể đọc file, bỏ qua
+                        pass
+            except (ValueError, AttributeError):
+                # Tên file không đúng format, bỏ qua
+                pass
+        
+        if deleted_count > 0:
+            self.logger.log_step(
+                step="CLEANUP_EMPTY_FILES",
+                result="SUCCESS",
+                deleted_count=deleted_count
+            )
+    
+    def add_job(
+        self,
+        account_id: str,
+        content: str,
+        scheduled_time: datetime,
+        priority: JobPriority = JobPriority.NORMAL,
+        max_retries: int = 3
+    ) -> str:
+        """
+        Thêm job mới vào scheduler.
+        
+        Args:
+            account_id: ID tài khoản
+            content: Nội dung thread
+            scheduled_time: Thời gian lên lịch
+            priority: Độ ưu tiên (mặc định: NORMAL)
+            max_retries: Số lần retry tối đa (mặc định: 3)
+        
+        Returns:
+            Job ID
+        
+        Raises:
+            InvalidScheduleTimeError: Nếu scheduled_time không hợp lệ
+            ValueError: Nếu input không hợp lệ
+            StorageError: Nếu không thể lưu job
+        """
+        # Validate inputs
+        if not account_id or not isinstance(account_id, str):
+            raise ValueError("account_id phải là string không rỗng")
+        
+        if not content or not isinstance(content, str):
+            raise ValueError("content phải là string không rỗng")
+        
+        if len(content) > 500:
+            raise ValueError(f"content quá dài ({len(content)} chars), tối đa 500 ký tự")
+        
+        if not isinstance(scheduled_time, datetime):
+            raise TypeError(f"scheduled_time phải là datetime object, nhận được: {type(scheduled_time)}")
+        
+        # Validate scheduled_time không quá xa trong quá khứ (> 1 năm)
+        now = datetime.now()
+        if scheduled_time < now - timedelta(days=365):
+            raise InvalidScheduleTimeError(
+                f"scheduled_time ({scheduled_time.isoformat()}) quá xa trong quá khứ (> 1 năm)"
+            )
+        
+        # Validate scheduled_time không quá xa trong tương lai (> 1 năm)
+        if scheduled_time > now + timedelta(days=365):
+            raise InvalidScheduleTimeError(
+                f"scheduled_time ({scheduled_time.isoformat()}) quá xa trong tương lai (> 1 năm)"
+            )
+        
+        if not isinstance(priority, JobPriority):
+            raise TypeError(f"priority phải là JobPriority enum, nhận được: {type(priority)}")
+        
+        if not isinstance(max_retries, int) or max_retries < 0:
+            raise ValueError(f"max_retries phải là số nguyên >= 0, nhận được: {max_retries}")
+        
+        try:
+            job_id = str(uuid4())
+            job = ScheduledJob(
+                job_id=job_id,
+                account_id=account_id,
+                content=content,
+                scheduled_time=scheduled_time,
+                priority=priority,
+                status=JobStatus.SCHEDULED,
+                max_retries=max_retries
+            )
+            
+            job.status_message = f"Đã thêm vào scheduler - sẽ chạy vào {scheduled_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            self.jobs[job_id] = job
+            self._save_jobs()
+            
+            self.logger.log_step(
+                step="ADD_JOB",
+                result="SUCCESS",
+                job_id=job_id,
+                account_id=account_id,
+                scheduled_time=scheduled_time.isoformat(),
+                priority=priority.value,
+                status_message=job.status_message
+            )
+            
+            return job_id
+        except StorageError:
+            # Re-raise storage errors
+            raise
+        except Exception as e:
+            self.logger.log_step(
+                step="ADD_JOB",
+                result="ERROR",
+                error=f"Failed to add job: {str(e)}",
+                error_type=type(e).__name__
+            )
+            raise SchedulerError(f"Failed to add job: {str(e)}") from e
+    
+    def remove_job(self, job_id: str) -> bool:
+        """
+        Xóa job khỏi scheduler.
+        
+        Args:
+            job_id: ID của job cần xóa
+        
+        Returns:
+            True nếu xóa thành công
+        
+        Raises:
+            JobNotFoundError: Nếu job không tồn tại
+            StorageError: Nếu không thể lưu sau khi xóa
+        """
+        if not job_id or not isinstance(job_id, str):
+            raise ValueError("job_id phải là string không rỗng")
+        
+        if job_id not in self.jobs:
+            self.logger.log_step(
+                step="REMOVE_JOB",
+                result="FAILED",
+                job_id=job_id,
+                error="Job not found"
+            )
+            raise JobNotFoundError(f"Job {job_id} không tồn tại")
+        
+        try:
+            del self.jobs[job_id]
+            self._save_jobs()
+            
+            self.logger.log_step(
+                step="REMOVE_JOB",
+                result="SUCCESS",
+                job_id=job_id
+            )
+            return True
+        except StorageError:
+            # Re-raise storage errors
+            raise
+        except Exception as e:
+            self.logger.log_step(
+                step="REMOVE_JOB",
+                result="ERROR",
+                job_id=job_id,
+                error=f"Failed to remove job: {str(e)}",
+                error_type=type(e).__name__
+            )
+            raise SchedulerError(f"Failed to remove job: {str(e)}") from e
+    
+    def list_jobs(
+        self,
+        account_id: Optional[str] = None,
+        status: Optional[JobStatus] = None
+    ) -> List[ScheduledJob]:
+        """
+        Liệt kê jobs.
+        
+        Args:
+            account_id: Lọc theo account ID (tùy chọn)
+            status: Lọc theo status (tùy chọn)
+        
+        Returns:
+            Danh sách jobs
+        """
+        jobs = list(self.jobs.values())
+        
+        if account_id:
+            jobs = [j for j in jobs if j.account_id == account_id]
+        
+        if status:
+            jobs = [j for j in jobs if j.status == status]
+        
+        # Sắp xếp theo priority và scheduled_time
+        jobs.sort(key=lambda j: (j.priority.value, j.scheduled_time), reverse=True)
+        
+        return jobs
+    
+    def get_ready_jobs(self) -> List[ScheduledJob]:
+        """
+        Lấy danh sách jobs sẵn sàng chạy.
+        
+        Returns:
+            Danh sách jobs sẵn sàng chạy, sắp xếp theo priority
+        """
+        ready_jobs = [j for j in self.jobs.values() if j.is_ready()]
+        ready_jobs.sort(key=lambda j: (j.priority.value, j.scheduled_time), reverse=True)
+        return ready_jobs
+    
+    def cleanup_expired_jobs(self) -> int:
+        """
+        Xóa các jobs đã hết hạn.
+        
+        Chỉ đánh dấu expired các jobs đã quá 24h từ scheduled_time
+        và chưa được completed.
+        
+        Returns:
+            Số lượng jobs đã đánh dấu expired
+        """
+        expired_jobs = [
+            job_id for job_id, job in self.jobs.items()
+            if job.is_expired() and job.status not in [JobStatus.COMPLETED, JobStatus.EXPIRED]
+        ]
+        
+        for job_id in expired_jobs:
+            job = self.jobs[job_id]
+            # Chỉ đánh dấu expired nếu thực sự đã quá 24h
+            if datetime.now() > job.scheduled_time + timedelta(hours=24):
+                job.status = JobStatus.EXPIRED
+                hours_past = (datetime.now() - job.scheduled_time).total_seconds() / 3600
+                job.status_message = f"Hết hạn - đã quá {int(hours_past)} giờ từ thời gian lên lịch ({job.scheduled_time.strftime('%Y-%m-%d %H:%M:%S')})"
+                self.logger.log_step(
+                    step="CLEANUP_EXPIRED_JOBS",
+                    result="SUCCESS",
+                    job_id=job_id,
+                    scheduled_time=job.scheduled_time.isoformat(),
+                    hours_past=hours_past,
+                    status_message=job.status_message
+                )
+        
+        if expired_jobs:
+            self._save_jobs()
+        
+        return len(expired_jobs)
+    
+    def recover_stuck_jobs(self, max_running_minutes: int = 30) -> int:
+        """
+        Recover các jobs bị stuck ở trạng thái RUNNING (do crash/mất mạng).
+        
+        Jobs bị stuck sẽ được:
+        - Reset về SCHEDULED nếu có thể retry
+        - Đánh dấu FAILED nếu đã hết retry
+        
+        Args:
+            max_running_minutes: Số phút tối đa job có thể ở trạng thái RUNNING (mặc định: 30 phút)
+        
+        Returns:
+            Số lượng jobs đã được recover
+        """
+        stuck_jobs = [
+            job_id for job_id, job in self.jobs.items()
+            if job.is_stuck(max_running_minutes)
+        ]
+        
+        recovered_count = 0
+        
+        for job_id in stuck_jobs:
+            job = self.jobs[job_id]
+            
+            # Tính thời gian đã chạy
+            if job.started_at:
+                running_duration = datetime.now() - job.started_at
+                running_minutes = int(running_duration.total_seconds() / 60)
+            else:
+                running_minutes = max_running_minutes + 1  # Fallback
+            
+            # Kiểm tra có thể retry không
+            if job.can_retry():
+                # Reset về SCHEDULED để retry
+                job.retry_count += 1
+                job.status = JobStatus.SCHEDULED
+                # Exponential backoff: 2^retry_count minutes
+                backoff_minutes = 2 ** job.retry_count
+                job.scheduled_time = datetime.now() + timedelta(minutes=backoff_minutes)
+                job.started_at = None  # Reset started_at
+                job.status_message = (
+                    f"Recovered từ stuck (đã chạy {running_minutes} phút), "
+                    f"sẽ thử lại sau {backoff_minutes} phút (lần thử {job.retry_count}/{job.max_retries})"
+                )
+                
+                self.logger.log_step(
+                    step="RECOVER_STUCK_JOB",
+                    result="RETRY_SCHEDULED",
+                    job_id=job_id,
+                    account_id=job.account_id,
+                    running_minutes=running_minutes,
+                    retry_count=job.retry_count,
+                    next_run=job.scheduled_time.isoformat(),
+                    status_message=job.status_message
+                )
+                recovered_count += 1
+            else:
+                # Đánh dấu FAILED nếu đã hết retry
+                job.status = JobStatus.FAILED
+                job.started_at = None  # Reset started_at
+                job.error = f"Job bị stuck {running_minutes} phút và đã hết retry ({job.retry_count}/{job.max_retries})"
+                job.status_message = f"Thất bại - {job.error}"
+                
+                self.logger.log_step(
+                    step="RECOVER_STUCK_JOB",
+                    result="FAILED",
+                    job_id=job_id,
+                    account_id=job.account_id,
+                    running_minutes=running_minutes,
+                    retry_count=job.retry_count,
+                    error=job.error,
+                    status_message=job.status_message
+                )
+                recovered_count += 1
+        
+        if stuck_jobs:
+            try:
+                self._save_jobs()
+            except StorageError as e:
+                self.logger.log_step(
+                    step="RECOVER_STUCK_JOBS",
+                    result="WARNING",
+                    error=f"Failed to save recovered jobs: {str(e)}",
+                    error_type="StorageError"
+                )
+        
+        if recovered_count > 0:
+            self.logger.log_step(
+                step="RECOVER_STUCK_JOBS",
+                result="SUCCESS",
+                recovered_count=recovered_count,
+                max_running_minutes=max_running_minutes
+            )
+        
+        return recovered_count
+    
+    def recover_all_running_jobs(self) -> int:
+        """
+        Recover TẤT CẢ jobs đang ở trạng thái RUNNING khi scheduler start.
+        
+        Được gọi khi scheduler khởi động để đảm bảo không có jobs RUNNING "mồ côi"
+        do crash/mất mạng. Tất cả jobs RUNNING sẽ được recover ngay lập tức.
+        
+        Returns:
+            Số lượng jobs đã được recover
+        """
+        running_jobs = [
+            job_id for job_id, job in self.jobs.items()
+            if job.status == JobStatus.RUNNING
+        ]
+        
+        if not running_jobs:
+            return 0
+        
+        recovered_count = 0
+        
+        for job_id in running_jobs:
+            job = self.jobs[job_id]
+            
+            # Tính thời gian đã chạy (nếu có started_at)
+            if job.started_at:
+                running_duration = datetime.now() - job.started_at
+                running_minutes = int(running_duration.total_seconds() / 60)
+            else:
+                # Không có started_at - coi như đã chạy 0 phút (hoặc không rõ)
+                running_minutes = 0
+            
+            # Kiểm tra có thể retry không
+            if job.can_retry():
+                # Reset về SCHEDULED để retry
+                job.retry_count += 1
+                job.status = JobStatus.SCHEDULED
+                # Exponential backoff: 2^retry_count minutes
+                backoff_minutes = 2 ** job.retry_count
+                job.scheduled_time = datetime.now() + timedelta(minutes=backoff_minutes)
+                job.started_at = None  # Reset started_at
+                job.status_message = (
+                    f"Recovered từ RUNNING khi scheduler start (đã chạy {running_minutes} phút), "
+                    f"sẽ thử lại sau {backoff_minutes} phút (lần thử {job.retry_count}/{job.max_retries})"
+                )
+                
+                self.logger.log_step(
+                    step="RECOVER_RUNNING_JOB",
+                    result="RETRY_SCHEDULED",
+                    job_id=job_id,
+                    account_id=job.account_id,
+                    running_minutes=running_minutes,
+                    retry_count=job.retry_count,
+                    next_run=job.scheduled_time.isoformat(),
+                    status_message=job.status_message
+                )
+                recovered_count += 1
+            else:
+                # Đánh dấu FAILED nếu đã hết retry
+                job.status = JobStatus.FAILED
+                job.started_at = None  # Reset started_at
+                job.error = f"Job bị RUNNING khi scheduler start và đã hết retry ({job.retry_count}/{job.max_retries})"
+                job.status_message = f"Thất bại - {job.error}"
+                
+                self.logger.log_step(
+                    step="RECOVER_RUNNING_JOB",
+                    result="FAILED",
+                    job_id=job_id,
+                    account_id=job.account_id,
+                    running_minutes=running_minutes,
+                    retry_count=job.retry_count,
+                    error=job.error,
+                    status_message=job.status_message
+                )
+                recovered_count += 1
+        
+        if running_jobs:
+            try:
+                self._save_jobs()
+            except StorageError as e:
+                self.logger.log_step(
+                    step="RECOVER_ALL_RUNNING_JOBS",
+                    result="WARNING",
+                    error=f"Failed to save recovered jobs: {str(e)}",
+                    error_type="StorageError"
+                )
+        
+        if recovered_count > 0:
+            self.logger.log_step(
+                step="RECOVER_ALL_RUNNING_JOBS",
+                result="SUCCESS",
+                recovered_count=recovered_count,
+                total_running=len(running_jobs)
+            )
+        
+        return recovered_count
+    
+    def _cleanup_expired_jobs(self) -> None:
+        """Internal method để cleanup expired jobs (gọi từ loop)."""
+        self.cleanup_expired_jobs()
+    
+    async def _run_job(self, job: ScheduledJob, post_callback) -> None:
+        """
+        Chạy một job.
+        
+        Args:
+            job: Job cần chạy
+            post_callback: Callback function để đăng bài (async function)
+        """
+        job.status = JobStatus.RUNNING
+        job.started_at = datetime.now()  # Lưu thời gian bắt đầu chạy
+        job.status_message = "Đang chạy - khởi động browser và đăng bài"
+        try:
+            self._save_jobs()
+        except StorageError as e:
+            # Không raise, chỉ log warning
+            self.logger.log_step(
+                step="RUN_JOB",
+                result="WARNING",
+                job_id=job.job_id,
+                error=f"Failed to save job status: {str(e)}",
+                error_type="StorageError"
+            )
+        
+        try:
+            self.logger.log_step(
+                step="RUN_JOB",
+                result="IN_PROGRESS",
+                job_id=job.job_id,
+                account_id=job.account_id,
+                retry_count=job.retry_count,
+                status_message=job.status_message
+            )
+            
+            # Gọi callback để đăng bài
+            result = await post_callback(job.account_id, job.content)
+            
+            if result.success:
+                job.status = JobStatus.COMPLETED
+                job.completed_at = datetime.now()
+                job.thread_id = result.thread_id if hasattr(result, 'thread_id') else None
+                job.status_message = f"Hoàn thành thành công - Thread ID: {job.thread_id or 'N/A'}"
+                self.logger.log_step(
+                    step="RUN_JOB",
+                    result="SUCCESS",
+                    job_id=job.job_id,
+                    thread_id=job.thread_id,
+                    status_message=job.status_message
+                )
+            else:
+                # Thử retry nếu có thể
+                if job.can_retry():
+                    job.retry_count += 1
+                    job.status = JobStatus.SCHEDULED
+                    # Exponential backoff: 2^retry_count minutes
+                    backoff_minutes = 2 ** job.retry_count
+                    job.scheduled_time = datetime.now() + timedelta(minutes=backoff_minutes)
+                    job.status_message = f"Thất bại, sẽ thử lại sau {backoff_minutes} phút (lần thử {job.retry_count}/{job.max_retries}) - Lỗi: {result.error}"
+                    
+                    self.logger.log_step(
+                        step="RUN_JOB",
+                        result="RETRY_SCHEDULED",
+                        job_id=job.job_id,
+                        retry_count=job.retry_count,
+                        next_run=job.scheduled_time.isoformat(),
+                        error=result.error,
+                        status_message=job.status_message
+                    )
+                else:
+                    job.status = JobStatus.FAILED
+                    job.error = result.error
+                    job.status_message = f"Thất bại hoàn toàn sau {job.retry_count} lần thử - {result.error}"
+                    self.logger.log_step(
+                        step="RUN_JOB",
+                        result="FAILED",
+                        job_id=job.job_id,
+                        error=result.error,
+                        retry_count=job.retry_count,
+                        status_message=job.status_message
+                    )
+        
+        except Exception as e:
+            # Thử retry nếu có thể
+            if job.can_retry():
+                job.retry_count += 1
+                job.status = JobStatus.SCHEDULED
+                backoff_minutes = 2 ** job.retry_count
+                job.scheduled_time = datetime.now() + timedelta(minutes=backoff_minutes)
+                job.status_message = f"Lỗi exception, sẽ thử lại sau {backoff_minutes} phút (lần thử {job.retry_count}/{job.max_retries}) - {type(e).__name__}: {str(e)}"
+                
+                self.logger.log_step(
+                    step="RUN_JOB",
+                    result="RETRY_SCHEDULED",
+                    job_id=job.job_id,
+                    retry_count=job.retry_count,
+                    next_run=job.scheduled_time.isoformat(),
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    status_message=job.status_message
+                )
+            else:
+                job.status = JobStatus.FAILED
+                job.error = f"{type(e).__name__}: {str(e)}"
+                job.status_message = f"Lỗi không thể retry sau {job.retry_count} lần thử - {type(e).__name__}: {str(e)}"
+                self.logger.log_step(
+                    step="RUN_JOB",
+                    result="ERROR",
+                    job_id=job.job_id,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    retry_count=job.retry_count,
+                    status_message=job.status_message
+                )
+        
+        finally:
+            self._save_jobs()
+    
+    async def _scheduler_loop(self, post_callback) -> None:
+        """
+        Vòng lặp scheduler chính.
+        
+        Args:
+            post_callback: Callback function để đăng bài
+        """
+        while self.running:
+            try:
+                # Check running flag ngay đầu loop để có thể exit nhanh
+                if not self.running:
+                    self.logger.log_step(
+                        step="SCHEDULER_LOOP",
+                        result="INFO",
+                        note="Scheduler running flag set to False, exiting loop"
+                    )
+                    break
+                
+                # Cleanup expired jobs
+                self.cleanup_expired_jobs()
+                
+                # Recover stuck jobs (jobs RUNNING quá lâu do crash/mất mạng)
+                self.recover_stuck_jobs()
+                
+                # Kiểm tra xem có job nào đang RUNNING không
+                # Scheduler chỉ nên chạy 1 job tại một thời điểm
+                running_jobs = [j for j in self.jobs.values() if j.status == JobStatus.RUNNING]
+                
+                if running_jobs:
+                    # Có job đang chạy, không chạy job mới
+                    # Chờ job hiện tại hoàn thành hoặc bị recover
+                    self.logger.log_step(
+                        step="SCHEDULER_LOOP",
+                        result="INFO",
+                        note=f"Job đang chạy, chờ hoàn thành. Running jobs: {len(running_jobs)}",
+                        running_job_ids=[j.job_id for j in running_jobs]
+                    )
+                    await asyncio.sleep(10)  # Chờ ngắn trước khi check lại
+                    continue
+                
+                # Check running flag lại trước khi chạy job
+                if not self.running:
+                    self.logger.log_step(
+                        step="SCHEDULER_LOOP",
+                        result="INFO",
+                        note="Scheduler running flag set to False, exiting loop before running job"
+                    )
+                    break
+                
+                # Lấy jobs sẵn sàng chạy
+                ready_jobs = self.get_ready_jobs()
+                
+                if ready_jobs:
+                    # Chạy job có priority cao nhất
+                    job = ready_jobs[0]
+                    await self._run_job(job, post_callback)
+                else:
+                    # Không có job nào sẵn sàng, chờ 30s (nhưng check running flag mỗi giây)
+                    for _ in range(30):
+                        if not self.running:
+                            break
+                        await asyncio.sleep(1)
+            
+            except asyncio.CancelledError:
+                # Scheduler đang được stop, log và re-raise
+                self.logger.log_step(
+                    step="SCHEDULER_LOOP",
+                    result="INFO",
+                    note="Scheduler loop cancelled"
+                )
+                # Set running = False để đảm bảo loop không tiếp tục
+                self.running = False
+                # Log STOP_SCHEDULER ngay tại đây để đảm bảo log được ghi
+                # (vì stop() có thể không được gọi nếu exception được raise trước)
+                self.logger.log_step(
+                    step="STOP_SCHEDULER",
+                    result="INFO",
+                    note="Scheduler loop cancelled, will be stopped"
+                )
+                # Force flush log handlers để đảm bảo log được ghi ngay
+                for handler in self.logger.logger.handlers:
+                    handler.flush()
+                # Save jobs trước khi exit
+                self._save_jobs()
+                raise
+            except Exception as e:
+                self.logger.log_step(
+                    step="SCHEDULER_LOOP",
+                    result="ERROR",
+                    error=str(e),
+                    error_type=type(e).__name__
+                )
+                # Chờ 10s trước khi tiếp tục để tránh loop lỗi liên tục
+                await asyncio.sleep(10)
+    
+    def start(self, post_callback) -> None:
+        """
+        Bắt đầu scheduler.
+        
+        Args:
+            post_callback: Callback function để đăng bài (async function)
+        """
+        if self.running:
+            self.logger.log_step(
+                step="START_SCHEDULER",
+                result="WARNING",
+                note="Scheduler already running"
+            )
+            return
+        
+        self.running = True
+        self._task = asyncio.create_task(self._scheduler_loop(post_callback))
+        
+        self.logger.log_step(
+            step="START_SCHEDULER",
+            result="SUCCESS",
+            jobs_count=len(self.jobs)
+        )
+    
+    async def stop(self) -> None:
+        """Dừng scheduler."""
+        # Log stop request (luôn log, kể cả khi đã stopped)
+        self.logger.log_step(
+            step="STOP_SCHEDULER",
+            result="INFO",
+            note=f"Stop requested, running: {self.running}, has_task: {self._task is not None}"
+        )
+        # Force flush log handlers để đảm bảo log được ghi ngay
+        for handler in self.logger.logger.handlers:
+            handler.flush()
+        
+        # Set running = False ngay lập tức để loop có thể exit
+        was_running = self.running
+        self.running = False
+        
+        if not was_running and not self._task:
+            # Đã stopped và không có task
+            self.logger.log_step(
+                step="STOP_SCHEDULER",
+                result="INFO",
+                note="Scheduler already stopped"
+            )
+            return
+        
+        if self._task:
+            # Cancel task
+            self._task.cancel()
+            try:
+                # Wait for task to finish (will raise CancelledError)
+                await self._task
+            except asyncio.CancelledError:
+                # Task đã được cancel thành công
+                # Log trước khi raise để đảm bảo log được ghi
+                # Force flush log để đảm bảo log được ghi ngay
+                self.logger.log_step(
+                    step="STOP_SCHEDULER",
+                    result="SUCCESS",
+                    note="Scheduler task cancelled successfully"
+                )
+                # Force flush log handlers để đảm bảo log được ghi ngay
+                for handler in self.logger.logger.handlers:
+                    handler.flush()
+                # Save jobs trước khi raise
+                self._save_jobs()
+                # Re-raise để đảm bảo cancellation được propagate
+                raise
+            except Exception as e:
+                # Lỗi khác khi await task
+                self.logger.log_step(
+                    step="STOP_SCHEDULER",
+                    result="ERROR",
+                    error=f"Error awaiting task: {str(e)}"
+                )
+                raise
+        
+        # Save jobs trước khi stop
+        self._save_jobs()
+        
+        # Log success nếu không có task hoặc task đã finish
+        if not self._task:
+            self.logger.log_step(
+                step="STOP_SCHEDULER",
+                result="SUCCESS",
+                note="Scheduler stopped (no task to cancel)"
+            )
+

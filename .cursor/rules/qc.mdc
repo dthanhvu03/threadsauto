@@ -1,0 +1,594 @@
+---
+alwaysApply: true
+---
+# QUALITY CONTROL & TESTING STANDARDS
+
+> **Related Files:**  
+> - `prompt.mdc` - Success criteria to validate  
+> - `dev.mdc` - Code to test  
+> - `code_standards.mdc` - Standards to review  
+> - `rulesthreads.mdc` - Quality mindset  
+> - `README.md` - Complete documentation
+
+---
+
+> **QC Rules cho Threads Automation Tool**  
+> Đảm bảo code quality, testing coverage, và production readiness
+
+---
+
+## I. TESTING STRATEGY
+
+### 1. Test Levels
+
+**Unit Tests:**
+- Test từng function/module độc lập
+- Mock external dependencies (Playwright, file system)
+- Test edge cases và error handling
+- Coverage target: >80% cho core modules
+
+**Integration Tests:**
+- Test interaction giữa các modules
+- Test với real browser (headed mode)
+- Test với mock Threads UI states
+- Test error recovery flows
+
+**End-to-End Tests:**
+- Test complete flows (login → post → verify)
+- Test với real Threads (staging/test account)
+- Test thread chain flows
+- Test scheduler execution
+
+**Manual Testing:**
+- UI state detection verification
+- Shadow fail detection verification
+- Anti-detection behavior verification
+- Account cooldown/soft-ban detection
+
+### 2. Test Categories
+
+**Functional Tests:**
+- All functional requirements work correctly
+- Error handling works as expected
+- Retry logic functions properly
+- State transitions are correct
+
+**Safety Tests:**
+- Rate limiting enforced
+- Duplicate detection works
+- Action spacing enforced
+- Auto pause triggers correctly
+
+**Performance Tests:**
+- No memory leaks
+- Browser cleanup works
+- Resource usage acceptable
+- Long-running stability
+
+**Security Tests:**
+- No credentials in code
+- Profile isolation works
+- Cookie persistence secure
+- No data leakage between accounts
+
+---
+
+## II. CODE QUALITY STANDARDS
+
+### 1. Code Structure
+
+**Modularity:**
+- Each module has single responsibility
+- Clear separation of concerns
+- Reusable components
+- No circular dependencies
+
+**Readability:**
+- Clear variable/function names
+- Comments explain WHY, not HOW
+- Docstrings for all public functions
+- Type hints where applicable
+
+**Maintainability:**
+- No hardcoded values (use config)
+- Selector versioning implemented
+- Feature toggles for experimental code
+- Easy to extend/modify
+
+### 2. Error Handling
+
+**Required Patterns:**
+- All actions wrapped in try-except
+- Specific exception types caught
+- Error messages are descriptive
+- Errors are logged with context
+- Fail-safe defaults provided
+
+**Forbidden Patterns:**
+- Bare except clauses
+- Silent failures (except when intentional)
+- Generic error messages
+- Errors without logging
+
+### 3. Logging Standards
+
+**Required:**
+- Structured logging format
+- All actions logged (STEP, RESULT, TIME)
+- Errors logged with full context
+- Account ID in all logs
+- Risk level tracked
+
+**Format:**
+```
+STEP=ACTION_NAME RESULT=SUCCESS|FAILED TIME=1.2s ERROR=... ACCOUNT=account_001
+```
+
+**Levels:**
+- DEBUG: Detailed execution flow
+- INFO: Normal operations
+- WARNING: Potential issues
+- ERROR: Failures that need attention
+- CRITICAL: System-breaking issues
+
+---
+
+## III. REVIEW CHECKLIST
+
+### Pre-Commit Checklist
+
+**Code Quality:**
+- [ ] No hardcoded values (use config.yaml)
+- [ ] All functions have docstrings
+- [ ] Type hints added where applicable
+- [ ] No unused imports/variables
+- [ ] Code follows PEP 8 style guide
+
+**Error Handling:**
+- [ ] All actions have try-except blocks
+- [ ] Specific exception types caught
+- [ ] Error messages are descriptive
+- [ ] Errors are logged with context
+- [ ] Fail-safe behavior implemented
+
+**Logging:**
+- [ ] All actions logged with structured format
+- [ ] Account ID included in logs
+- [ ] Error context included
+- [ ] Risk level tracked when applicable
+- [ ] No sensitive data in logs
+
+**Testing:**
+- [ ] Unit tests written for new functions
+- [ ] Integration tests updated
+- [ ] Edge cases tested
+- [ ] Error paths tested
+- [ ] Manual testing completed
+
+**Safety:**
+- [ ] Rate limiting implemented
+- [ ] Duplicate detection works
+- [ ] Action spacing enforced
+- [ ] Auto pause logic tested
+- [ ] No credentials in code
+
+**Anti-detection:**
+- [ ] Random delays implemented
+- [ ] Typing in chunks
+- [ ] Click offsets randomized
+- [ ] Pattern avoidance implemented
+- [ ] Human-like behavior verified
+
+**UI Handling:**
+- [ ] All UI states handled
+- [ ] Shadow fail detection works
+- [ ] Retry logic tested
+- [ ] Timeout handling works
+- [ ] Fallback selectors provided
+
+---
+
+## IV. VALIDATION CRITERIA
+
+### 1. Functional Validation
+
+**Browser & Session:**
+- [ ] Browser launches in headed mode
+- [ ] Profile isolation works (one account = one profile)
+- [ ] Cookie persistence works across sessions
+- [ ] Shadow DOM handled correctly
+- [ ] Timing/race conditions handled
+
+**Login Detection:**
+- [ ] Login state detected correctly
+- [ ] Fallback selectors work
+- [ ] Manual login flow works
+- [ ] Auto-login works on subsequent runs
+
+**Post Thread:**
+- [ ] Post flow works end-to-end
+- [ ] Anti-detection behavior implemented
+- [ ] All UI states detected
+- [ ] Shadow fail detected and handled
+- [ ] Retry logic works
+- [ ] Success verification works
+
+**Thread Chain:**
+- [ ] Reply flow works
+- [ ] Random delays between replies
+- [ ] Chain verification works
+- [ ] Same anti-detection applied
+
+**Scheduler:**
+- [ ] Jobs execute on schedule
+- [ ] Retry policy works
+- [ ] Dead jobs handled
+- [ ] Expired jobs skipped
+- [ ] Priority queue works
+
+**Safety Guard:**
+- [ ] Rate limiting enforced
+- [ ] Duplicate detection works
+- [ ] Action spacing enforced
+- [ ] Auto pause triggers correctly
+- [ ] Risk assessment works
+
+**Content Engineering:**
+- [ ] Text length validation works
+- [ ] Line break normalization works
+- [ ] Emoji encoding works
+- [ ] Duplicate hash detection works
+
+**Error Handling:**
+- [ ] Retry with exponential backoff works
+- [ ] Rollback on critical failures works
+- [ ] Skip on non-critical failures works
+- [ ] All errors logged with context
+
+### 2. Safety Validation
+
+**Rate Limiting:**
+- [ ] Sliding window works correctly
+- [ ] Max actions per window enforced
+- [ ] Rate limit violations detected
+- [ ] Auto pause on violations
+
+**Duplicate Detection:**
+- [ ] Content hashing works
+- [ ] History check works
+- [ ] Duplicate posts prevented
+- [ ] Hash collision handled
+
+**Action Spacing:**
+- [ ] Minimum delay enforced
+- [ ] Timing tracked correctly
+- [ ] Violations detected
+- [ ] Auto pause on violations
+
+**Auto Pause:**
+- [ ] High-risk events tracked
+- [ ] Consecutive errors tracked
+- [ ] Threshold triggers work
+- [ ] Account state updated correctly
+
+### 3. Anti-detection Validation
+
+**Behavior Simulation:**
+- [ ] Random delays vary correctly
+- [ ] Typing in chunks works
+- [ ] Click offsets randomized
+- [ ] Mouse movements random
+- [ ] Patterns avoided
+
+**Timing:**
+- [ ] No exact same timing patterns
+- [ ] Action sequences vary
+- [ ] Reading time included
+- [ ] Thinking time included
+
+### 4. UI State Validation
+
+**State Detection:**
+- [ ] Loading state detected
+- [ ] Disabled state detected
+- [ ] Success state detected
+- [ ] Error state detected
+- [ ] Shadow fail detected
+
+**Verification:**
+- [ ] State changes waited for
+- [ ] Timeout handling works
+- [ ] Retry with backoff works
+- [ ] Shadow fail checks work
+
+---
+
+## V. TESTING TOOLS & FRAMEWORKS
+
+### Recommended Tools
+
+**Unit Testing:**
+- pytest (primary)
+- unittest (backup)
+- pytest-cov (coverage)
+- pytest-mock (mocking)
+
+**Integration Testing:**
+- pytest with Playwright fixtures
+- Mock Threads UI states
+- Test with real browser
+
+**Code Quality:**
+- pylint (linting)
+- black (formatting)
+- mypy (type checking)
+- bandit (security)
+
+**Coverage:**
+- pytest-cov
+- Coverage target: >80% for core modules
+- Report generated: coverage.html
+
+### Test Structure
+
+```
+tests/
+├── unit/
+│   ├── test_browser_automation.py
+│   ├── test_anti_detection.py
+│   ├── test_content_engineering.py
+│   ├── test_safety_guard.py
+│   └── test_scheduler.py
+│
+├── integration/
+│   ├── test_login_flow.py
+│   ├── test_post_flow.py
+│   ├── test_thread_chain.py
+│   └── test_scheduler_integration.py
+│
+├── e2e/
+│   ├── test_complete_flow.py
+│   └── test_account_management.py
+│
+├── fixtures/
+│   ├── browser_fixtures.py
+│   ├── mock_ui_states.py
+│   └── test_accounts.py
+│
+└── conftest.py
+```
+
+---
+
+## VI. TESTING BEST PRACTICES
+
+### 1. Test Isolation
+
+- Each test is independent
+- No shared state between tests
+- Clean up after each test
+- Use fixtures for setup/teardown
+
+### 2. Test Data
+
+- Use test accounts (not production)
+- Mock external dependencies
+- Use realistic but safe test data
+- Clean up test data after tests
+
+### 3. Test Coverage
+
+- Test happy paths
+- Test error paths
+- Test edge cases
+- Test boundary conditions
+- Test concurrent operations
+
+### 4. Test Maintenance
+
+- Update tests when code changes
+- Remove obsolete tests
+- Keep tests fast (< 5s for unit, < 30s for integration)
+- Document test purpose
+
+---
+
+## VII. CODE REVIEW CRITERIA
+
+### Must Have
+
+**Functionality:**
+- [ ] Code implements requirement correctly
+- [ ] Edge cases handled
+- [ ] Error handling implemented
+- [ ] Logging added
+
+**Quality:**
+- [ ] Code is readable and maintainable
+- [ ] No hardcoded values
+- [ ] Type hints where applicable
+- [ ] Docstrings for public functions
+
+**Safety:**
+- [ ] Safety guard integrated
+- [ ] Rate limiting considered
+- [ ] No credentials in code
+- [ ] Profile isolation maintained
+
+**Testing:**
+- [ ] Unit tests written
+- [ ] Integration tests updated
+- [ ] Manual testing completed
+- [ ] Test coverage acceptable
+
+### Should Have
+
+**Performance:**
+- [ ] No obvious performance issues
+- [ ] Resource cleanup implemented
+- [ ] Memory leaks checked
+
+**Documentation:**
+- [ ] README updated if needed
+- [ ] Code comments explain WHY
+- [ ] Configuration documented
+
+**Maintainability:**
+- [ ] Selector versioning used
+- [ ] Feature toggles used
+- [ ] Easy to extend/modify
+
+---
+
+## VIII. PRODUCTION READINESS CHECKLIST
+
+### Before Deployment
+
+**Code Quality:**
+- [ ] All tests pass
+- [ ] Code coverage >80%
+- [ ] No linting errors
+- [ ] No security issues (bandit)
+
+**Functionality:**
+- [ ] All requirements implemented
+- [ ] Error handling complete
+- [ ] Logging comprehensive
+- [ ] Configuration complete
+
+**Safety:**
+- [ ] Rate limiting tested
+- [ ] Duplicate detection tested
+- [ ] Auto pause tested
+- [ ] Account isolation verified
+
+**Documentation:**
+- [ ] README updated
+- [ ] Configuration documented
+- [ ] Usage examples provided
+- [ ] Troubleshooting guide available
+
+**Testing:**
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] E2E tests pass
+- [ ] Manual testing completed
+
+---
+
+## IX. CONTINUOUS IMPROVEMENT
+
+### Metrics to Track
+
+**Code Quality:**
+- Test coverage percentage
+- Linting error count
+- Code complexity metrics
+- Technical debt
+
+**Testing:**
+- Test execution time
+- Test failure rate
+- Flaky test count
+- Test maintenance effort
+
+**Production:**
+- Error rate
+- Success rate
+- Performance metrics
+- Account health
+
+### Review Process
+
+**Weekly:**
+- Review test coverage
+- Review error logs
+- Review performance metrics
+
+**Monthly:**
+- Review code quality trends
+- Review test effectiveness
+- Review production issues
+
+**Quarterly:**
+- Review testing strategy
+- Update QC standards
+- Improve processes
+
+---
+
+## X. COMMON ISSUES & SOLUTIONS
+
+### Issue: Flaky Tests
+
+**Causes:**
+- Timing dependencies
+- Shared state
+- External dependencies
+
+**Solutions:**
+- Use proper waits/timeouts
+- Isolate test state
+- Mock external dependencies
+- Add retry logic for flaky tests
+
+### Issue: Low Test Coverage
+
+**Causes:**
+- Missing unit tests
+- Complex code paths
+- Legacy code
+
+**Solutions:**
+- Write tests for new code
+- Refactor complex code
+- Add tests incrementally
+- Set coverage targets
+
+### Issue: Slow Tests
+
+**Causes:**
+- Real browser tests
+- Network calls
+- Heavy setup/teardown
+
+**Solutions:**
+- Use mocks where possible
+- Parallel test execution
+- Optimize fixtures
+- Separate fast/slow tests
+
+---
+
+## XI. QC PRINCIPLES
+
+1. **Test Early, Test Often**
+   - Write tests alongside code
+   - Don't defer testing
+   - Fix issues immediately
+
+2. **Quality > Speed**
+   - Don't skip tests for speed
+   - Don't compromise quality
+   - Maintain standards
+
+3. **Automation First**
+   - Automate repetitive tests
+   - Use CI/CD for testing
+   - Reduce manual testing
+
+4. **Fail Fast, Fail Clear**
+   - Tests should fail clearly
+   - Error messages should be helpful
+   - Fix issues before proceeding
+
+5. **Continuous Improvement**
+   - Review and improve processes
+   - Learn from failures
+   - Update standards regularly
+
+---
+
+**Last Updated:** 2024  
+**Version:** 1.0.0  
+**Maintainer:** Engineering Team
