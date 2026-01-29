@@ -20,13 +20,9 @@ export default defineConfig({
   },
   build: {
     target: 'es2015',
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
+    minify: 'esbuild', // Faster than terser, no extra dependency needed
+    // If you want to drop console/debugger, use esbuild minify options
+    // or switch back to terser after installing: npm install terser --save-dev
     rollupOptions: {
       output: {
         manualChunks: {
