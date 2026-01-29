@@ -345,7 +345,7 @@
 import { onMounted, onUnmounted, computed, ref, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDashboard } from '@/features/dashboard/composables/useDashboard'
-import { useJobs } from '@/features/jobs/composables/useJobs.js'
+import { useJobs } from '@/features/jobs/composables/useJobs'
 import { useAccountsStore } from '@/stores/accounts'
 import { useWebSocketStore } from '@/stores/websocket'
 import Card from '@/components/common/Card.vue'
