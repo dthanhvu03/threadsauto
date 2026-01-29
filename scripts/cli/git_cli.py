@@ -599,6 +599,32 @@ class GitCLI:
         print(f"Remote: {remote}")
         print(f"Branch: {branch}\n")
         
+        # Get current branch to check if we need to create new branch
+        current_branch_result = self._run_git_command(
+            ['branch', '--show-current'],
+            check=False,
+            capture_output=True
+        )
+        current_branch = current_branch_result.stdout.strip() if current_branch_result.stdout else None
+        
+        # Check if branch exists locally
+        branch_check = self._run_git_command(
+            ['show-ref', '--verify', '--quiet', f'refs/heads/{branch}'],
+            check=False,
+            capture_output=True
+        )
+        if branch_check.returncode != 0:
+            # Branch doesn't exist locally - auto-create it from current branch
+            if current_branch:
+                print(f"⚠️  Branch '{branch}' không tồn tại, đang tạo từ current branch '{current_branch}'...")
+                self._run_git_command(['checkout', '-b', branch])
+                print(f"✅ Đã tạo và checkout branch: {branch}")
+            else:
+                # No current branch (detached HEAD or no commits), create orphan branch
+                print(f"⚠️  Branch '{branch}' không tồn tại, đang tạo branch mới...")
+                self._run_git_command(['checkout', '-b', branch])
+                print(f"✅ Đã tạo và checkout branch: {branch}")
+        
         # Check if using SSH and setup GitHub host key if needed
         remote_result = self._run_git_command(
             ['remote', 'get-url', remote],
@@ -687,6 +713,19 @@ class GitCLI:
         )
         current_branch = branch_result.stdout.strip() if branch_result.stdout else None
         target_branch = branch or current_branch
+        
+        # If target branch is different from current branch, check if it exists
+        if target_branch and target_branch != current_branch:
+            branch_check = self._run_git_command(
+                ['show-ref', '--verify', '--quiet', f'refs/heads/{target_branch}'],
+                check=False,
+                capture_output=True
+            )
+            if branch_check.returncode != 0:
+                # Branch doesn't exist, create it from current branch
+                print(f"⚠️  Branch '{target_branch}' không tồn tại, đang tạo từ current branch '{current_branch}'...")
+                self._run_git_command(['checkout', '-b', target_branch])
+                print(f"✅ Đã tạo và checkout branch: {target_branch}")
         
         # Check if upstream exists
         upstream_result = self._run_git_command(
