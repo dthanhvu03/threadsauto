@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     priority INT NOT NULL DEFAULT 2,
     status VARCHAR(50) NOT NULL,
     platform VARCHAR(50) DEFAULT 'threads',
+    job_type VARCHAR(50) DEFAULT 'post' COMMENT 'post or engagement',
+    engagement_data JSON NULL DEFAULT NULL COMMENT 'Engagement criteria (like_criteria, comment_criteria, follow_criteria)',
     max_retries INT NOT NULL DEFAULT 3,
     retry_count INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -50,9 +52,11 @@ CREATE TABLE IF NOT EXISTS jobs (
     INDEX idx_thread_id (thread_id),
     INDEX idx_account_status (account_id, status),
     INDEX idx_status_scheduled (status, scheduled_time),
-    INDEX idx_platform (platform)
+    INDEX idx_platform (platform),
+    INDEX idx_job_type (job_type),
+    INDEX idx_account_job_type (account_id, job_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='All scheduled jobs (replaces JSON files)';
+COMMENT='All scheduled jobs (replaces JSON files) - supports both POST and ENGAGEMENT jobs';
 
 -- Jobs View (backward compatibility for analytics)
 CREATE OR REPLACE VIEW jobs_view AS
@@ -199,3 +203,90 @@ CREATE TABLE IF NOT EXISTS excel_processing_locks (
     INDEX idx_started_at (started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='Processing locks for Excel files (prevents concurrent processing)';
+
+-- Engagement Actions Table
+CREATE TABLE IF NOT EXISTS engagement_actions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    account_id VARCHAR(255) NOT NULL,
+    action_type VARCHAR(50) NOT NULL COMMENT 'like, comment, or follow',
+    target_id VARCHAR(255) NULL DEFAULT NULL COMMENT 'post_id, user_id, etc.',
+    success BOOLEAN NOT NULL DEFAULT TRUE,
+    error TEXT NULL DEFAULT NULL,
+    metadata JSON NULL DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    INDEX idx_account_id (account_id),
+    INDEX idx_action_type (action_type),
+    INDEX idx_success (success),
+    INDEX idx_created_at (created_at),
+    INDEX idx_account_action (account_id, action_type),
+    INDEX idx_account_created (account_id, created_at),
+    INDEX idx_target_id (target_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Engagement actions executed (likes, comments, follows)';
+
+-- Engagement Post History Table (tránh like trùng)
+CREATE TABLE IF NOT EXISTS engagement_post_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    account_id VARCHAR(255) NOT NULL,
+    post_id VARCHAR(255) NOT NULL,
+    action_type VARCHAR(50) NOT NULL COMMENT 'like, comment, or follow',
+    action_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    metadata JSON NULL DEFAULT NULL,
+    
+    UNIQUE KEY unique_account_post_action (account_id, post_id, action_type),
+    INDEX idx_account_id (account_id),
+    INDEX idx_post_id (post_id),
+    INDEX idx_action_type (action_type),
+    INDEX idx_action_date (action_date),
+    INDEX idx_account_action (account_id, action_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Track posts đã thực hiện engagement (tránh duplicate)';
+
+-- Feed Items Table (lưu feed posts từ Threads)
+CREATE TABLE IF NOT EXISTS feed_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    post_id VARCHAR(255) NOT NULL,
+    account_id VARCHAR(255) NOT NULL,
+    username VARCHAR(255) NOT NULL,
+    text TEXT,
+    like_count INT DEFAULT 0,
+    reply_count INT DEFAULT 0,
+    repost_count INT DEFAULT 0,
+    share_count INT DEFAULT 0,
+    view_count INT DEFAULT NULL,
+    media_urls JSON NULL DEFAULT NULL,
+    timestamp BIGINT NOT NULL COMMENT 'Unix timestamp (seconds)',
+    timestamp_iso VARCHAR(50) NOT NULL COMMENT 'ISO 8601 timestamp',
+    user_id VARCHAR(255) NOT NULL,
+    user_display_name VARCHAR(255) NULL DEFAULT NULL,
+    user_avatar_url TEXT NULL DEFAULT NULL,
+    is_verified BOOLEAN DEFAULT FALSE,
+    post_url TEXT NOT NULL,
+    shortcode VARCHAR(255) NOT NULL,
+    is_reply BOOLEAN DEFAULT FALSE,
+    parent_post_id VARCHAR(255) NULL DEFAULT NULL,
+    thread_id VARCHAR(255) NOT NULL,
+    quoted_post JSON NULL DEFAULT NULL,
+    hashtags JSON NULL DEFAULT NULL COMMENT 'Array of hashtags',
+    mentions JSON NULL DEFAULT NULL COMMENT 'Array of mentions',
+    links JSON NULL DEFAULT NULL COMMENT 'Array of links',
+    media_type INT NULL DEFAULT NULL COMMENT '1=image, 2=video',
+    video_duration INT NULL DEFAULT NULL COMMENT 'Video duration (seconds)',
+    fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'When this feed item was fetched',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY unique_post_account_fetch (post_id, account_id, fetched_at),
+    INDEX idx_post_id (post_id),
+    INDEX idx_account_id (account_id),
+    INDEX idx_username (username),
+    INDEX idx_timestamp (timestamp),
+    INDEX idx_fetched_at (fetched_at),
+    INDEX idx_account_fetched (account_id, fetched_at),
+    INDEX idx_thread_id (thread_id),
+    INDEX idx_is_reply (is_reply),
+    INDEX idx_parent_post_id (parent_post_id),
+    FULLTEXT INDEX idx_text_fulltext (text)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Feed items fetched from Threads (with history tracking)';

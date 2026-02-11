@@ -46,18 +46,18 @@ def validate_job_input(job_data: Dict[str, Any], is_update: bool = False) -> Tup
         # Content is required for create
         return False, "Content is required"
     
-    # Validate account_id (required for create, optional for update)
+    # Validate account_id (optional for both create and update)
+    # Allow None, empty string, or valid account_id
     if "account_id" in job_data:
-        account_id = job_data.get("account_id", "")
-        if account_id:  # Allow empty for update (can be null)
+        account_id = job_data.get("account_id")
+        # Allow None or empty string (optional)
+        if account_id is not None and account_id != "":
             if not isinstance(account_id, str):
                 return False, "account_id must be a string"
             is_valid, error_msg = validate_account_id(account_id)
             if not is_valid:
                 return False, error_msg
-    elif not is_update:
-        # Account ID is required for create
-        return False, "account_id is required"
+    # Note: account_id is optional, so we don't require it even for create
     
     # Validate scheduled_time (required for create, optional for update)
     if "scheduled_time" in job_data:

@@ -163,6 +163,33 @@ class AnalyticsConfig:
 
 
 @dataclass
+class EngagementConfig:
+    """Engagement automation configuration."""
+    # Rate limits (per hour)
+    like_rate_limit_max: int = 50
+    comment_rate_limit_max: int = 20
+    follow_rate_limit_max: int = 30
+    
+    # Daily limits
+    daily_likes_max: int = 200
+    daily_comments_max: int = 50
+    daily_follows_max: int = 100
+    
+    # Action spacing (seconds)
+    min_delay_between_likes: float = 2.0
+    max_delay_between_likes: float = 5.0
+    min_delay_between_comments: float = 3.0
+    max_delay_between_comments: float = 8.0
+    min_delay_between_follows: float = 5.0
+    max_delay_between_follows: float = 15.0
+    
+    # Anti-detection settings
+    scroll_before_action: bool = True
+    click_with_offset: bool = True
+    random_delays: bool = True
+
+
+@dataclass
 class PlatformConfig:
     """Platform URLs configuration."""
     threads_base_url: str = "https://www.threads.com/?hl=vi"
@@ -172,6 +199,46 @@ class PlatformConfig:
     threads_post_url_template: str = "https://www.threads.com/@{username}/post/{thread_id}"
     threads_post_fallback_template: str = "https://www.threads.com/post/{thread_id}"
     facebook_url: str = "https://www.facebook.com"
+
+
+@dataclass
+class ApiTimeoutConfig:
+    """API timeout configuration."""
+    default: int = 300000  # 5 minutes default
+    feed_extraction: int = 300000  # 5 minutes for feed extraction
+    quick_operation: int = 30000  # 30 seconds for quick operations
+    interaction: int = 120000  # 2 minutes for interactions
+    bulk_operation: int = 600000  # 10 minutes for bulk operations
+
+
+@dataclass
+class AccountIdConfig:
+    """Account ID extraction configuration."""
+    parse_jwt: bool = False  # Enable JWT token parsing
+    jwt_secret: Optional[str] = None  # JWT secret (required if parse_jwt = True)
+    custom_headers: list = None  # Custom headers to extract account ID from
+    log_extraction: bool = False  # Log account ID extraction for debugging
+    
+    def __post_init__(self):
+        """Initialize custom_headers if not provided."""
+        if self.custom_headers is None:
+            self.custom_headers = []
+
+
+@dataclass
+class ApiConfig:
+    """API server configuration."""
+    port: int = 3000
+    host: str = "0.0.0.0"
+    timeout: Optional[ApiTimeoutConfig] = None
+    account_id: Optional[AccountIdConfig] = None
+    
+    def __post_init__(self):
+        """Initialize configs if not provided."""
+        if self.timeout is None:
+            self.timeout = ApiTimeoutConfig()
+        if self.account_id is None:
+            self.account_id = AccountIdConfig()
 
 
 @dataclass
@@ -191,6 +258,8 @@ class Config:
     storage: Optional[StorageConfig] = None
     platform: Optional[PlatformConfig] = None
     analytics: Optional[AnalyticsConfig] = None
+    engagement: Optional[EngagementConfig] = None
+    api: Optional[ApiConfig] = None
     
     def __post_init__(self):
         """Initialize default configs if not provided."""
@@ -217,6 +286,12 @@ class Config:
         
         if self.analytics is None:
             self.analytics = AnalyticsConfig()
+        
+        if self.engagement is None:
+            self.engagement = EngagementConfig()
+        
+        if self.api is None:
+            self.api = ApiConfig()
         
         # Adjust based on mode
         if self.mode == RunMode.FAST:

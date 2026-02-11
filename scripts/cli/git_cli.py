@@ -10,7 +10,12 @@ Commands:
     add         - Add files (--all hoặc specific files)
     commit      - Commit với message
     push        - Push lên remote
+    pull        - Pull từ remote
     quick       - Quick push (add all, commit, push)
+    branch      - Tạo branch mới với tên theo convention (feature/fix/refactor/test/docs)
+    init        - Khởi tạo git repository
+    setup-remote - Setup remote repository
+    setup       - Complete setup (init + remote + commit + push)
 """
 
 import sys
@@ -19,6 +24,8 @@ import argparse
 import getpass
 import os
 import json
+import re
+import traceback
 from pathlib import Path
 from typing import List, Optional
 
@@ -176,11 +183,27 @@ class GitCLI:
             # Use GIT_SSH_COMMAND to auto-accept host keys for GitHub
             # This prevents interactive prompts
             if 'GIT_SSH_COMMAND' not in env:
-                env['GIT_SSH_COMMAND'] = 'ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=~/.ssh/known_hosts'
+                env['GIT_SSH_COMMAND'] = (
+                    'ssh -o StrictHostKeyChecking=accept-new '
+                    '-o UserKnownHostsFile=~/.ssh/known_hosts'
+                )
         
         # #region agent log
-        with open('.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({"location": "git_cli.py:180", "message": "_run_git_command: executing", "data": {"cmd": git_cmd, "check": check, "capture_output": capture_output}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+        with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+            log_data = {
+                "location": "git_cli.py:180",
+                "message": "_run_git_command: executing",
+                "data": {
+                    "cmd": git_cmd,
+                    "check": check,
+                    "capture_output": capture_output
+                },
+                "timestamp": int(__import__('time').time() * 1000),
+                "sessionId": "debug-session",
+                "runId": "run1",
+                "hypothesisId": "A"
+            }
+            f.write(json.dumps(log_data) + "\n")
         # #endregion
         try:
             result = subprocess.run(
@@ -194,14 +217,46 @@ class GitCLI:
                 env=env
             )
             # #region agent log
-            with open('.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({"location": "git_cli.py:195", "message": "_run_git_command: success", "data": {"returncode": result.returncode, "has_stdout": bool(result.stdout), "has_stderr": bool(result.stderr)}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+            with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+                log_data = {
+                    "location": "git_cli.py:195",
+                    "message": "_run_git_command: success",
+                    "data": {
+                        "returncode": result.returncode,
+                        "has_stdout": bool(result.stdout),
+                        "has_stderr": bool(result.stderr)
+                    },
+                    "timestamp": int(__import__('time').time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "A"
+                }
+                f.write(json.dumps(log_data) + "\n")
             # #endregion
             return result
         except subprocess.CalledProcessError as e:
             # #region agent log
-            with open('.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({"location": "git_cli.py:198", "message": "_run_git_command: CalledProcessError", "data": {"has_stderr": bool(e.stderr), "has_stdout": bool(e.stdout), "stderr_preview": str(e.stderr)[:200] if e.stderr else None, "stdout_preview": str(e.stdout)[:200] if e.stdout else None, "capture_output": capture_output}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A,B"}) + "\n")
+            with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+                log_data = {
+                    "location": "git_cli.py:198",
+                    "message": "_run_git_command: CalledProcessError",
+                    "data": {
+                        "has_stderr": bool(e.stderr),
+                        "has_stdout": bool(e.stdout),
+                        "stderr_preview": (
+                            str(e.stderr)[:200] if e.stderr else None
+                        ),
+                        "stdout_preview": (
+                            str(e.stdout)[:200] if e.stdout else None
+                        ),
+                        "capture_output": capture_output
+                    },
+                    "timestamp": int(__import__('time').time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "A,B"
+                }
+                f.write(json.dumps(log_data) + "\n")
             # #endregion
             # Get error message from stderr, stdout, or exception
             # Handle encoding errors gracefully
@@ -228,8 +283,20 @@ class GitCLI:
             if not error_msg:
                 error_msg = str(e)
             # #region agent log
-            with open('.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({"location": "git_cli.py:207", "message": "_run_git_command: error message built", "data": {"error_msg_length": len(error_msg), "error_msg_preview": error_msg[:200]}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "B"}) + "\n")
+            with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+                log_data = {
+                    "location": "git_cli.py:207",
+                    "message": "_run_git_command: error message built",
+                    "data": {
+                        "error_msg_length": len(error_msg),
+                        "error_msg_preview": error_msg[:200]
+                    },
+                    "timestamp": int(__import__('time').time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "B"
+                }
+                f.write(json.dumps(log_data) + "\n")
             # #endregion
             
             print(f"❌ Git command failed: {' '.join(git_cmd)}")
@@ -237,7 +304,12 @@ class GitCLI:
                 print(f"   Error: {error_msg.strip()}")
             
             # Check for authentication errors
-            if "Authentication failed" in error_msg or "Invalid username or token" in error_msg or "Password authentication is not supported" in error_msg:
+            auth_errors = (
+                "Authentication failed" in error_msg or
+                "Invalid username or token" in error_msg or
+                "Password authentication is not supported" in error_msg
+            )
+            if auth_errors:
                 print("\n" + "=" * 80)
                 print("⚠️  AUTHENTICATION ERROR")
                 print("=" * 80)
@@ -325,6 +397,155 @@ class GitCLI:
             raise
         except subprocess.TimeoutExpired:
             raise ValueError(f"Git command timeout: {' '.join(git_cmd)}")
+    
+    def _format_branch_name(self, branch_type: str, description: str) -> str:
+        """
+        Format branch name according to convention.
+        
+        Args:
+            branch_type: Type of branch (feature/fix/refactor/test/docs)
+            description: Description of the branch
+        
+        Returns:
+            Formatted branch name: {type}/{sanitized-description}
+        
+        Raises:
+            ValueError: If branch_type is invalid or description is empty
+        """
+        # Allowed branch types
+        allowed_types = ['feature', 'fix', 'refactor', 'test', 'docs']
+        
+        # Validate branch type
+        branch_type = branch_type.lower().strip()
+        if branch_type not in allowed_types:
+            raise ValueError(
+                f"Invalid branch type: {branch_type}\n"
+                f"   Allowed types: {', '.join(allowed_types)}"
+            )
+        
+        # Validate description
+        if not description or not description.strip():
+            raise ValueError("Branch description cannot be empty")
+        
+        # Sanitize description
+        desc = description.strip()
+        
+        # Convert to lowercase
+        desc = desc.lower()
+        
+        # Replace spaces and underscores with hyphens
+        desc = re.sub(r'[\s_]+', '-', desc)
+        
+        # Remove special characters (keep only alphanumeric, hyphens, and dots)
+        desc = re.sub(r'[^a-z0-9\-.]', '', desc)
+        
+        # Remove consecutive hyphens
+        desc = re.sub(r'-+', '-', desc)
+        
+        # Remove leading and trailing hyphens and dots
+        desc = desc.strip('-.')
+        
+        # Validate length (max 50 chars after type prefix)
+        if len(desc) > 50:
+            desc = desc[:50].rstrip('-')
+        
+        # Final validation: must not be empty after sanitization
+        if not desc:
+            raise ValueError(
+                f"Description '{description}' becomes empty after sanitization. "
+                "Please use alphanumeric characters."
+            )
+        
+        # Format: {type}/{sanitized-description}
+        branch_name = f"{branch_type}/{desc}"
+        
+        # Validate final branch name (Git branch name rules)
+        # Git branch names cannot contain: spaces, ~, ^, :, ?, *, [, \, @
+        if re.search(r'[~\^:?*\[\\@\s]', branch_name):
+            raise ValueError(f"Invalid characters in branch name: {branch_name}")
+        
+        return branch_name
+    
+    def create_branch(
+        self,
+        branch_type: str,
+        description: str,
+        checkout: bool = False,
+        from_branch: Optional[str] = None
+    ) -> str:
+        """
+        Create branch with formatted name.
+        
+        Args:
+            branch_type: Type of branch (feature/fix/refactor/test/docs)
+            description: Description of the branch
+            checkout: Whether to checkout the new branch (default: False)
+            from_branch: Branch to create from (default: current branch)
+        
+        Returns:
+            Formatted branch name
+        
+        Raises:
+            ValueError: If branch type is invalid, description is empty, or branch exists
+        """
+        # Check if git repository exists
+        if not (self.repo_path / ".git").exists():
+            raise ValueError(
+                f"Không phải git repository: {self.repo_path}\n"
+                f"   Vui lòng chạy: python scripts/cli/git_cli.py init"
+            )
+        
+        # Format branch name
+        branch_name = self._format_branch_name(branch_type, description)
+        
+        # Check if branch already exists
+        branch_check = self._run_git_command(
+            ['show-ref', '--verify', '--quiet', f'refs/heads/{branch_name}'],
+            check=False,
+            capture_output=True
+        )
+        if branch_check.returncode == 0:
+            raise ValueError(
+                f"Branch '{branch_name}' already exists.\n"
+                f"   Use a different description or delete the existing branch."
+            )
+        
+        # Get source branch (from_branch or current branch)
+        if from_branch:
+            # Verify source branch exists
+            source_check = self._run_git_command(
+                ['show-ref', '--verify', '--quiet', f'refs/heads/{from_branch}'],
+                check=False,
+                capture_output=True
+            )
+            if source_check.returncode != 0:
+                raise ValueError(f"Source branch '{from_branch}' does not exist")
+            source = from_branch
+        else:
+            # Use current branch
+            current_result = self._run_git_command(
+                ['branch', '--show-current'],
+                check=True,
+                capture_output=True
+            )
+            source = current_result.stdout.strip()
+            if not source:
+                raise ValueError("No current branch found. Please checkout a branch first.")
+        
+        # Create branch
+        print_header("🌿 CREATING BRANCH")
+        print(f"Branch name: {branch_name}")
+        print(f"From branch: {source}\n")
+        
+        self._run_git_command(['branch', branch_name, source])
+        print(f"✅ Đã tạo branch: {branch_name}")
+        
+        # Checkout if requested
+        if checkout:
+            self._run_git_command(['checkout', branch_name])
+            print(f"✅ Đã checkout branch: {branch_name}")
+        
+        return branch_name
     
     def status(self, short: bool = False) -> None:
         """
@@ -426,7 +647,7 @@ class GitCLI:
     def _check_git_config(self) -> tuple[bool, Optional[str], Optional[str]]:
         """
         Check if Git user config is set.
-        
+
         Returns:
             Tuple of (is_configured, user_name, user_email)
         """
@@ -440,11 +661,19 @@ class GitCLI:
             check=False,
             capture_output=True
         )
-        
-        user_name = name_result.stdout.strip() if name_result.returncode == 0 and name_result.stdout else None
-        user_email = email_result.stdout.strip() if email_result.returncode == 0 and email_result.stdout else None
-        
-        is_configured = user_name and user_email
+
+        user_name: Optional[str] = (
+            name_result.stdout.strip()
+            if name_result.returncode == 0 and name_result.stdout
+            else None
+        )
+        user_email: Optional[str] = (
+            email_result.stdout.strip()
+            if email_result.returncode == 0 and email_result.stdout
+            else None
+        )
+
+        is_configured: bool = bool(user_name and user_email)
         return is_configured, user_name, user_email
     
     def _setup_git_user(self, name: Optional[str] = None, email: Optional[str] = None, global_config: bool = False) -> None:
@@ -469,7 +698,7 @@ class GitCLI:
         self._run_git_command(['config', config_scope, 'user.name', name])
         self._run_git_command(['config', config_scope, 'user.email', email])
         
-        print(f"✅ Đã cấu hình Git user:")
+        print("✅ Đã cấu hình Git user:")
         print(f"   Name: {name}")
         print(f"   Email: {email}")
         print(f"   Scope: {'global' if global_config else 'local'}")
@@ -780,16 +1009,48 @@ class GitCLI:
         
         try:
             # #region agent log
-            with open('.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({"location": "git_cli.py:708", "message": "pull: attempting initial pull", "data": {"cmd": pull_cmd, "remote": remote, "branch": branch}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+            with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+                log_data = {
+                    "location": "git_cli.py:708",
+                    "message": "pull: attempting initial pull",
+                    "data": {
+                        "cmd": pull_cmd,
+                        "remote": remote,
+                        "branch": branch
+                    },
+                    "timestamp": int(__import__('time').time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "A"
+                }
+                f.write(json.dumps(log_data) + "\n")
             # #endregion
             # Use capture_output=True to capture error messages for proper error handling
             self._run_git_command(pull_cmd, capture_output=True)
             print(f"✅ Đã pull {branch} từ {remote}")
         except subprocess.CalledProcessError as e:
             # #region agent log
-            with open('.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({"location": "git_cli.py:712", "message": "pull: exception caught", "data": {"has_stderr": bool(e.stderr), "has_stdout": bool(e.stdout), "stderr_preview": str(e.stderr)[:100] if e.stderr else None, "stdout_preview": str(e.stdout)[:100] if e.stdout else None, "exception_str": str(e)[:200]}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A,B"}) + "\n")
+            with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+                log_data = {
+                    "location": "git_cli.py:712",
+                    "message": "pull: exception caught",
+                    "data": {
+                        "has_stderr": bool(e.stderr),
+                        "has_stdout": bool(e.stdout),
+                        "stderr_preview": (
+                            str(e.stderr)[:100] if e.stderr else None
+                        ),
+                        "stdout_preview": (
+                            str(e.stdout)[:100] if e.stdout else None
+                        ),
+                        "exception_str": str(e)[:200]
+                    },
+                    "timestamp": int(__import__('time').time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "A,B"
+                }
+                f.write(json.dumps(log_data) + "\n")
             # #endregion
             # Get error message from stderr, stdout, or exception
             error_msg = ""
@@ -802,15 +1063,44 @@ class GitCLI:
             error_msg_lower = error_msg.lower()
             
             # #region agent log
-            with open('.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({"location": "git_cli.py:720", "message": "pull: error message extracted", "data": {"error_msg_length": len(error_msg), "error_msg_preview": error_msg[:200], "error_msg_lower_preview": error_msg_lower[:200], "contains_unrelated": "refusing to merge unrelated histories" in error_msg_lower, "contains_divergent": "divergent branches" in error_msg_lower}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "C"}) + "\n")
+            with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+                log_data = {
+                    "location": "git_cli.py:720",
+                    "message": "pull: error message extracted",
+                    "data": {
+                        "error_msg_length": len(error_msg),
+                        "error_msg_preview": error_msg[:200],
+                        "error_msg_lower_preview": error_msg_lower[:200],
+                        "contains_unrelated": (
+                            "refusing to merge unrelated histories"
+                            in error_msg_lower
+                        ),
+                        "contains_divergent": (
+                            "divergent branches" in error_msg_lower
+                        )
+                    },
+                    "timestamp": int(__import__('time').time() * 1000),
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "C"
+                }
+                f.write(json.dumps(log_data) + "\n")
             # #endregion
             
             # Check for unrelated histories error
             if "refusing to merge unrelated histories" in error_msg_lower:
                 # #region agent log
-                with open('.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({"location": "git_cli.py:723", "message": "pull: unrelated histories detected, retrying", "data": {}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "D"}) + "\n")
+                with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+                    log_data = {
+                        "location": "git_cli.py:723",
+                        "message": "pull: unrelated histories detected, retrying",
+                        "data": {},
+                        "timestamp": int(__import__('time').time() * 1000),
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "D"
+                    }
+                    f.write(json.dumps(log_data) + "\n")
                 # #endregion
                 print("\n" + "=" * 80)
                 print("⚠️  UNRELATED HISTORIES DETECTED")
@@ -821,21 +1111,51 @@ class GitCLI:
                 # Retry with --allow-unrelated-histories
                 pull_cmd_retry = ['pull', '--no-rebase', '--allow-unrelated-histories', remote, branch]
                 # #region agent log
-                with open('.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({"location": "git_cli.py:731", "message": "pull: executing retry command", "data": {"retry_cmd": pull_cmd_retry}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "E"}) + "\n")
+                with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+                    log_data = {
+                        "location": "git_cli.py:731",
+                        "message": "pull: executing retry command",
+                        "data": {"retry_cmd": pull_cmd_retry},
+                        "timestamp": int(__import__('time').time() * 1000),
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "E"
+                    }
+                    f.write(json.dumps(log_data) + "\n")
                 # #endregion
                 try:
                     # Use capture_output=True to capture error messages for proper error handling
                     self._run_git_command(pull_cmd_retry, capture_output=True)
                     # #region agent log
-                    with open('.cursor/debug.log', 'a') as f:
-                        f.write(json.dumps({"location": "git_cli.py:733", "message": "pull: retry succeeded", "data": {}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "E"}) + "\n")
+                    with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+                        log_data = {
+                            "location": "git_cli.py:733",
+                            "message": "pull: retry succeeded",
+                            "data": {},
+                            "timestamp": int(__import__('time').time() * 1000),
+                            "sessionId": "debug-session",
+                            "runId": "run1",
+                            "hypothesisId": "E"
+                        }
+                        f.write(json.dumps(log_data) + "\n")
                     # #endregion
                     print(f"✅ Đã pull {branch} từ {remote} (với --allow-unrelated-histories)")
                 except Exception as retry_error:
                     # #region agent log
-                    with open('.cursor/debug.log', 'a') as f:
-                        f.write(json.dumps({"location": "git_cli.py:738", "message": "pull: retry failed", "data": {"error_type": type(retry_error).__name__, "error_msg": str(retry_error)[:200]}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "E"}) + "\n")
+                    with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+                        log_data = {
+                            "location": "git_cli.py:738",
+                            "message": "pull: retry failed",
+                            "data": {
+                                "error_type": type(retry_error).__name__,
+                                "error_msg": str(retry_error)[:200]
+                            },
+                            "timestamp": int(__import__('time').time() * 1000),
+                            "sessionId": "debug-session",
+                            "runId": "run1",
+                            "hypothesisId": "E"
+                        }
+                        f.write(json.dumps(log_data) + "\n")
                     # #endregion
                     raise
             # Check for unmerged files (merge conflict) error
@@ -878,8 +1198,17 @@ class GitCLI:
                 print(f"✅ Đã pull {branch} từ {remote} (với merge)")
             else:
                 # #region agent log
-                with open('.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps({"location": "git_cli.py:796", "message": "pull: no matching error handler, re-raising", "data": {"error_msg_preview": error_msg[:200]}, "timestamp": int(__import__('time').time() * 1000), "sessionId": "debug-session", "runId": "run1", "hypothesisId": "D"}) + "\n")
+                with open('.cursor/debug.log', 'a', encoding='utf-8') as f:
+                    log_data = {
+                        "location": "git_cli.py:796",
+                        "message": "pull: no matching error handler, re-raising",
+                        "data": {"error_msg_preview": error_msg[:200]},
+                        "timestamp": int(__import__('time').time() * 1000),
+                        "sessionId": "debug-session",
+                        "runId": "run1",
+                        "hypothesisId": "D"
+                    }
+                    f.write(json.dumps(log_data) + "\n")
                 # #endregion
                 raise
     
@@ -1269,9 +1598,10 @@ def show_advanced_menu(cli: GitCLI) -> None:
         print("3. Commit with options")
         print("4. Push with options")
         print("5. Pull with options")
+        print("6. Create new branch")
         print("0. Back to main menu")
         
-        choice = prompt_input("\nChọn option (0-5)")
+        choice = prompt_input("\nChọn option (0-6)")
         
         if choice == "0":
             break
@@ -1332,6 +1662,67 @@ def show_advanced_menu(cli: GitCLI) -> None:
                     remote=remote or "origin",
                     branch=branch if branch else None,
                     rebase=rebase
+                )
+            except Exception as e:
+                print(f"\n❌ Lỗi: {e}")
+            prompt_input("\nNhấn Enter để tiếp tục...", default="")
+        elif choice == "6":
+            try:
+                print("\nBranch types:")
+                print("  1. feature - New features")
+                print("  2. fix - Bug fixes")
+                print("  3. refactor - Code refactoring")
+                print("  4. test - Test improvements")
+                print("  5. docs - Documentation")
+                
+                type_choice = prompt_input("\nChọn branch type (1-5 hoặc nhập tên)", default="1")
+                
+                # Map choice to type
+                type_map = {
+                    '1': 'feature',
+                    '2': 'fix',
+                    '3': 'refactor',
+                    '4': 'test',
+                    '5': 'docs'
+                }
+                
+                branch_type = type_map.get(type_choice, type_choice.lower())
+                
+                # Validate type
+                allowed_types = ['feature', 'fix', 'refactor', 'test', 'docs']
+                if branch_type not in allowed_types:
+                    print(f"❌ Invalid branch type: {branch_type}")
+                    print(f"   Allowed types: {', '.join(allowed_types)}")
+                    prompt_input("\nNhấn Enter để tiếp tục...", default="")
+                    continue
+                
+                description = prompt_input("Branch description")
+                if not description:
+                    print("⚠️  Branch description không được để trống")
+                    prompt_input("\nNhấn Enter để tiếp tục...", default="")
+                    continue
+                
+                # Show preview
+                try:
+                    branch_name = cli._format_branch_name(branch_type, description)
+                    print(f"\n📝 Branch name will be: {branch_name}")
+                except ValueError as e:
+                    print(f"\n❌ Lỗi: {e}")
+                    prompt_input("\nNhấn Enter để tiếp tục...", default="")
+                    continue
+                
+                # Ask for checkout
+                checkout = prompt_yes_no("Checkout this branch after creation?", default=False)
+                
+                # Ask for source branch
+                from_branch = prompt_input("Source branch (Enter để dùng current branch)", default="")
+                
+                # Create branch
+                cli.create_branch(
+                    branch_type=branch_type,
+                    description=description,
+                    checkout=checkout,
+                    from_branch=from_branch if from_branch else None
                 )
             except Exception as e:
                 print(f"\n❌ Lỗi: {e}")
@@ -1428,6 +1819,14 @@ def main():
     pull_parser.add_argument('--branch', help='Branch name (default: current branch)')
     pull_parser.add_argument('--rebase', action='store_true', help='Use rebase instead of merge')
     
+    # Branch command
+    branch_parser = subparsers.add_parser('branch', help='Create new branch with formatted name')
+    branch_parser.add_argument('--type', required=True, choices=['feature', 'fix', 'refactor', 'test', 'docs'],
+                              help='Branch type (feature/fix/refactor/test/docs)')
+    branch_parser.add_argument('--description', required=True, help='Branch description')
+    branch_parser.add_argument('--checkout', action='store_true', help='Checkout the new branch after creation')
+    branch_parser.add_argument('--from', dest='from_branch', help='Branch to create from (default: current branch)')
+    
     # Init command
     subparsers.add_parser('init', help='Khởi tạo git repository')
     
@@ -1504,6 +1903,20 @@ def main():
                 branch=args.branch,
                 rebase=args.rebase
             )
+        elif args.command == 'branch':
+            # Show preview of branch name
+            branch_name = cli._format_branch_name(args.type, args.description)
+            print(f"📝 Branch name will be: {branch_name}")
+            
+            # Use checkout flag if provided, otherwise default to False
+            checkout = args.checkout
+            
+            cli.create_branch(
+                branch_type=args.type,
+                description=args.description,
+                checkout=checkout,
+                from_branch=getattr(args, 'from_branch', None)
+            )
         elif args.command == 'setup-remote':
             cli.setup_remote(
                 url=args.url,
@@ -1523,7 +1936,6 @@ def main():
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ Lỗi: {e}")
-        import traceback
         traceback.print_exc()
         sys.exit(1)
 

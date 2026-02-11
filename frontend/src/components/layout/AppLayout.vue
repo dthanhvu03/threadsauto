@@ -26,7 +26,9 @@
           <Bars3Icon class="h-6 w-6" />
         </button>
         <div class="flex items-center space-x-2 ml-2">
-          <span class="text-xl">🧵</span>
+          <svg class="w-6 h-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+          </svg>
           <h1 class="text-base font-semibold text-gray-900">
             Threads Automation
           </h1>
@@ -50,6 +52,9 @@
         </div>
       </main>
     </div>
+
+    <!-- Toast Container -->
+    <ToastContainer />
   </div>
 </template>
 
@@ -58,6 +63,7 @@ import { ref, onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import { Bars3Icon } from '@heroicons/vue/24/outline'
 import Sidebar from './Sidebar.vue'
+import ToastContainer from '@/components/common/ToastContainer.vue'
 import { useAccountsStore } from '@/stores/accounts'
 import { useAccounts } from '@/features/accounts/composables/useAccounts'
 

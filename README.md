@@ -12,12 +12,13 @@ Công cụ automation local để đăng nội dung Threads sử dụng Playwrig
 - ✅ **Post Scheduling**: Lên lịch đăng bài với priority và retry logic
 - ✅ **Excel Integration**: Đăng nhiều bài từ file Excel
 - ✅ **Git CLI Tool**: Interactive menu để quản lý Git operations dễ dàng
-- ✅ **Safety Guard**: Rate limiting và phát hiện trùng lặp (sẽ triển khai)
+- 🚧 **Safety Guard**: Rate limiting và phát hiện trùng lặp (đang phát triển)
 
 ## Yêu cầu
 
 - Python 3.11+
-- Playwright
+- Node.js 18+ (cho feed extraction)
+- Playwright (Python và Node.js)
 - Chromium browser
 - pandas, openpyxl (cho Excel integration)
 
@@ -38,8 +39,14 @@ source venv/bin/activate  # Linux/Mac
 # 3. Cài đặt dependencies
 pip install -r requirements.txt
 
-# 4. Cài đặt Playwright browsers
+# 4. Cài đặt Playwright browsers (Python)
 playwright install chromium
+
+# 5. Cài đặt Node.js dependencies (cho feed extraction)
+cd scripts
+npm install
+npx playwright install chromium
+cd ..
 ```
 
 ## Sử dụng nhanh
@@ -117,8 +124,6 @@ UI sẽ mở tại: `http://localhost:5173`
 - 👤 Accounts: Account management
 
 Xem chi tiết trong [UI_USAGE.md](docs/UI_USAGE.md)
-
-**Note:** Streamlit UI đã được thay thế bằng Vue.js UI. Streamlit code đã được xóa.
 
 ---
 
@@ -346,12 +351,12 @@ Log được ghi vào thư mục `logs/` theo định dạng structured:
 STEP=POST_THREAD RESULT=SUCCESS TIME=1234.56ms ACCOUNT=account_01 THREAD_ID=123456
 ```
 
-## Tính năng an toàn
+## Tính năng sắp tới (Roadmap)
 
-- Rate limiting (sẽ triển khai)
-- Phát hiện nội dung trùng lặp (sẽ triển khai)
-- Thực thi khoảng cách giữa các hành động (sẽ triển khai)
-- Tự động tạm dừng khi rủi ro cao (sẽ triển khai)
+- Rate limiting
+- Phát hiện nội dung trùng lặp
+- Thực thi khoảng cách giữa các hành động
+- Tự động tạm dừng khi rủi ro cao
 
 ## Kiến trúc
 

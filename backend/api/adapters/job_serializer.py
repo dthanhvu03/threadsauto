@@ -100,17 +100,18 @@ def serialize_job(job: Any) -> Dict[str, Any]:
         content_preview = content[:100] + "..." if len(content) > 100 else content
         content_full = content
     else:
-        content_preview = ''
-        content_full = ''
+        content_preview = ""
+        content_full = ""
 
     # Sanitize error nếu có (error messages vẫn cần sanitize)
     sanitized_error = sanitize_error(error) if error else None
 
-    # Format datetime fields using Vietnam timezone
-    scheduled_time_str = _dt_to_str_vn(scheduled_time)
-    created_at_str = _dt_to_str_vn(created_at)
-    started_at_str = _dt_to_str_vn(started_at)
-    completed_at_str = _dt_to_str_vn(completed_at)
+    # Format datetime fields as ISO UTC strings
+    # Frontend handles VN timezone conversion for display
+    scheduled_time_str = _dt_to_str(scheduled_time)
+    created_at_str = _dt_to_str(created_at)
+    started_at_str = _dt_to_str(started_at)
+    completed_at_str = _dt_to_str(completed_at)
 
     status_value = _enum_to_value(status)
     priority_value = _enum_to_value(priority)

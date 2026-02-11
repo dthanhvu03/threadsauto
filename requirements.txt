@@ -5,9 +5,18 @@ openpyxl>=3.1.0
 streamlit>=1.28.0
 plotly>=5.17.0
 
+# HTML parsing
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
 # Database
 pymysql>=1.1.0
 python-dotenv>=1.0.0
+
+# HTTP client
+httpx>=0.24.0
+fastapi>=0.104.0
+uvicorn>=0.24.0
 
 # System monitoring
 psutil>=5.9.0

@@ -2,10 +2,20 @@
   <div>
     <div class="mb-4 md:mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0">
       <div>
-        <h1 class="text-xl md:text-2xl font-semibold text-gray-900 mb-1">📅 Jobs</h1>
+        <h1 class="text-xl md:text-2xl font-semibold text-gray-900 mb-1 flex items-center gap-2">
+          <CalendarIcon class="w-6 h-6 md:w-7 md:h-7" aria-hidden="true" />
+          Jobs
+        </h1>
         <p class="text-xs md:text-sm text-gray-600">Manage and monitor your scheduled jobs</p>
       </div>
-      <Button @click="showCreateModal = true" class="w-full md:w-auto">+ Create Job</Button>
+      <Button 
+        @click="showCreateModal = true" 
+        class="w-full md:w-auto"
+        aria-label="Create new job"
+      >
+        <PlusIcon class="w-4 h-4 mr-1.5" aria-hidden="true" />
+        Create Job
+      </Button>
     </div>
 
     <Alert
@@ -55,7 +65,15 @@
           type="date"
         />
         <div class="flex flex-col md:flex-row gap-2 md:space-x-2 md:items-end">
-          <Button variant="outline" @click="handleClearFilters" class="w-full md:w-auto">Clear</Button>
+          <Button 
+            variant="outline" 
+            @click="handleClearFilters" 
+            class="w-full md:w-auto"
+            aria-label="Clear all filters"
+          >
+            <XMarkIcon class="w-4 h-4 mr-1.5" aria-hidden="true" />
+            Clear
+          </Button>
         </div>
       </div>
     </Card>
@@ -64,12 +82,27 @@
     <Card>
       <template #header>
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-0">
-          <h3 class="text-base md:text-lg font-semibold">Jobs List</h3>
-          <Button size="sm" variant="outline" @click="refreshJobs" class="w-full md:w-auto">🔄 Refresh</Button>
+          <h2 class="text-base md:text-lg font-semibold">Jobs List</h2>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            @click="refreshJobs" 
+            class="w-full md:w-auto"
+            :disabled="loading"
+            aria-label="Refresh jobs list"
+          >
+            <ArrowPathIcon 
+              class="w-4 h-4 mr-1.5 motion-reduce:animate-none" 
+              :class="{ 'animate-spin': loading }" 
+              aria-hidden="true" 
+            />
+            Refresh
+          </Button>
         </div>
       </template>
-      <div v-if="loading" class="flex justify-center py-12">
+      <div v-if="loading" class="flex justify-center py-12" role="status" aria-live="polite">
         <LoadingSpinner size="lg" />
+        <span class="sr-only">Loading jobs...</span>
       </div>
       <div v-else-if="filteredJobs.length === 0" class="py-8">
         <EmptyState
@@ -112,7 +145,9 @@
               @click="editJob(row)" 
               :disabled="row.status === 'completed' || row.status === 'running'"
               class="w-full md:w-auto"
+              :aria-label="`Edit job ${row.job_id}`"
             >
+              <PencilIcon class="w-4 h-4 mr-1" aria-hidden="true" />
               Edit
             </Button>
             <Button 
@@ -120,7 +155,9 @@
               variant="danger" 
               @click="handleDeleteJob(row.job_id)" 
               class="w-full md:w-auto"
+              :aria-label="`Delete job ${row.job_id}`"
             >
+              <TrashIcon class="w-4 h-4 mr-1" aria-hidden="true" />
               Delete
             </Button>
           </div>
@@ -139,14 +176,24 @@
     </Card>
 
     <!-- Edit Job Modal -->
-    <Modal v-model="showEditModal" title="Edit Job" size="lg">
-      <form v-if="editingJob" @submit.prevent="handleUpdateJob">
+    <Modal 
+      v-model="showEditModal" 
+      title="Edit Job" 
+      size="lg"
+      aria-labelledby="edit-job-title"
+      aria-describedby="edit-job-description"
+    >
+      <p id="edit-job-description" class="sr-only">Edit job details and scheduling information</p>
+      <form v-if="editingJob" @submit.prevent="handleUpdateJob" aria-label="Edit job form">
         <div class="space-y-4">
           <FormInput
             v-model="editingJob.content"
             label="Content"
             placeholder="Enter job content"
             required
+            autocomplete="off"
+            spellcheck="true"
+            aria-required="true"
           />
           <FormSelect
             v-model="editingJob.account_id"
@@ -194,7 +241,9 @@
             v-model="editingJob.link_aff"
             label="Affiliate Link (Optional)"
             placeholder="Enter affiliate link"
-            type="text"
+            type="url"
+            autocomplete="url"
+            spellcheck="false"
           />
         </div>
       </form>
@@ -207,14 +256,24 @@
     </Modal>
 
     <!-- Create Job Modal -->
-    <Modal v-model="showCreateModal" title="Create New Job" size="lg">
-      <form @submit.prevent="handleCreateJob">
+    <Modal 
+      v-model="showCreateModal" 
+      title="Create New Job" 
+      size="lg"
+      aria-labelledby="create-job-title"
+      aria-describedby="create-job-description"
+    >
+      <p id="create-job-description" class="sr-only">Create a new scheduled job with content and platform selection</p>
+      <form @submit.prevent="handleCreateJob" aria-label="Create job form">
         <div class="space-y-4">
           <FormInput
             v-model="newJob.content"
             label="Content"
             placeholder="Enter job content"
             required
+            autocomplete="off"
+            spellcheck="true"
+            aria-required="true"
           />
           <FormSelect
             v-model="newJob.account_id"
@@ -262,7 +321,9 @@
             v-model="newJob.link_aff"
             label="Affiliate Link (Optional)"
             placeholder="Enter affiliate link"
-            type="text"
+            type="url"
+            autocomplete="url"
+            spellcheck="false"
           />
         </div>
       </form>
@@ -283,6 +344,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useJobs } from '@/features/jobs/composables/useJobs'
 import { useAccounts } from '@/features/accounts/composables/useAccounts'
 import { useWebSocketStore } from '@/stores/websocket'
+import { useToast } from '@/core/composables/useToast'
 import Card from '@/components/common/Card.vue'
 import Button from '@/components/common/Button.vue'
 import Alert from '@/components/common/Alert.vue'
@@ -294,6 +356,17 @@ import FormInput from '@/components/common/FormInput.vue'
 import FormSelect from '@/components/common/FormSelect.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import { formatDateTimeVN, utcToDatetimeLocal, datetimeLocalToUTC } from '@/utils/datetime'
+import { 
+  CalendarIcon, 
+  PlusIcon, 
+  ArrowPathIcon, 
+  XMarkIcon, 
+  PencilIcon, 
+  TrashIcon 
+} from '@heroicons/vue/24/outline'
+
+// Toast notifications
+const toast = useToast()
 
 // Use composable instead of direct store access
 const {
@@ -738,37 +811,74 @@ watch(
 )
 
 const handleCreateJob = async () => {
-  // Convert datetime-local from Vietnam timezone to UTC ISO string for API
-  // Handle empty account_id (convert to null if empty string)
-  const jobData = {
-    ...newJob.value,
-    account_id: newJob.value.account_id?.trim() || null,
-    scheduled_time: datetimeLocalToUTC(newJob.value.scheduled_time)
-  }
-  
-  // Business logic is now in composable (formatting, scheduled_time default)
-  const result = await createJob(jobData)
-  if (result) {
-    showCreateModal.value = false
-    // Reset form with all fields
-    newJob.value = {
-      content: '',
-      account_id: '',
-      platform: 'threads',
-      priority: 'normal',
-      scheduled_time: getDefaultScheduledTime(),
-      link_aff: '',
-      max_retries: 3
+  try {
+    // Convert datetime-local from Vietnam timezone to UTC ISO string for API
+    // Handle empty account_id (convert to null if empty string)
+    // Fix: account_id can be number (from FormSelect auto-conversion) or string
+    // Preserve original string value from accounts list to maintain leading zeros (e.g., "02")
+    let accountIdValue = newJob.value.account_id
+    if (accountIdValue != null && accountIdValue !== '') {
+      // If account_id is a number (FormSelect converted it), lookup original string from accounts
+      if (typeof accountIdValue === 'number') {
+        const foundAccount = accounts.value.find(acc => {
+          // Try to match by converting both to numbers for comparison
+          const accIdNum = Number(acc.account_id)
+          return !isNaN(accIdNum) && accIdNum === accountIdValue
+        })
+        if (foundAccount) {
+          // Use original string value from accounts list (preserves leading zeros)
+          accountIdValue = foundAccount.account_id
+        } else {
+          // Fallback: convert to string (but will lose leading zeros)
+          accountIdValue = String(accountIdValue)
+        }
+      } else {
+        // Already a string, just trim
+        accountIdValue = String(accountIdValue).trim()
+      }
+      // If empty after processing, set to null
+      if (accountIdValue === '') {
+        accountIdValue = null
+      }
+    } else {
+      accountIdValue = null
     }
-    // Sync local filters with store filters after job creation
-    // This ensures the dropdown shows the correct filter value
-    if (storeFilters) {
-      filters.value.accountId = storeFilters.value.accountId || ''
-      filters.value.status = storeFilters.value.status || ''
-      filters.value.platform = storeFilters.value.platform || ''
-      filters.value.scheduled_from = storeFilters.value.scheduled_from || ''
-      filters.value.scheduled_to = storeFilters.value.scheduled_to || ''
+    
+    const jobData = {
+      ...newJob.value,
+      account_id: accountIdValue,
+      scheduled_time: datetimeLocalToUTC(newJob.value.scheduled_time)
     }
+    
+    // Business logic is now in composable (formatting, scheduled_time default)
+    const result = await createJob(jobData)
+    
+    if (result) {
+      showCreateModal.value = false
+      // Reset form with all fields
+      newJob.value = {
+        content: '',
+        account_id: '',
+        platform: 'threads',
+        priority: 'normal',
+        scheduled_time: getDefaultScheduledTime(),
+        link_aff: '',
+        max_retries: 3
+      }
+      // Sync local filters with store filters after job creation
+      // This ensures the dropdown shows the correct filter value
+      if (storeFilters) {
+        filters.value.accountId = storeFilters.value.accountId || ''
+        filters.value.status = storeFilters.value.status || ''
+        filters.value.platform = storeFilters.value.platform || ''
+        filters.value.scheduled_from = storeFilters.value.scheduled_from || ''
+        filters.value.scheduled_to = storeFilters.value.scheduled_to || ''
+      }
+    }
+  } catch (error) {
+    console.error('Error creating job:', error)
+    // Error is already handled in createJob composable, but show toast for user feedback
+    toast.error('Failed to create job', error.message || 'Unknown error occurred')
   }
 }
 
@@ -825,6 +935,7 @@ const editJob = (job) => {
     showEditModal.value = true
   } catch (error) {
     console.error('Error in editJob:', error)
+    toast.error('Failed to edit job', error.message || 'Unknown error occurred')
   }
 }
 
@@ -863,7 +974,11 @@ const handleUpdateJob = async () => {
 }
 
 const handleDeleteJob = async (jobId) => {
-  if (confirm('Are you sure you want to delete this job?')) {
+  // Use proper confirmation dialog (UX guidelines: Confirmation Dialogs)
+  const confirmed = window.confirm(
+    `Are you sure you want to delete job ${jobId}? This action cannot be undone.`
+  )
+  if (confirmed) {
     try {
       const result = await deleteJob(jobId)
       if (result) {
@@ -872,6 +987,7 @@ const handleDeleteJob = async (jobId) => {
       }
     } catch (error) {
       console.error('Failed to delete job:', error)
+      toast.error('Failed to delete job', error.message || 'Unknown error occurred')
     }
   }
 }

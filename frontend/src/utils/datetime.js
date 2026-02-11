@@ -1,177 +1,136 @@
 /**
  * Datetime formatting utilities for Vietnam timezone (UTC+7).
  * 
- * All datetime values are converted from UTC to Vietnam timezone (Asia/Ho_Chi_Minh)
- * and formatted according to Vietnamese date format standards.
+ * STRATEGY:
+ * - Backend sends ISO UTC strings (e.g. "2026-02-10T03:15:00+00:00")
+ * - Frontend converts UTC → VN time (UTC+7) for display
+ * - Frontend converts VN form input → UTC for API calls
  */
 
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000 // +7 hours in milliseconds
+
 /**
- * Convert a date to Vietnam timezone (UTC+7).
+ * Parse an ISO string or Date into a proper Date object.
+ * Handles 'Z' suffix, timezone offsets, and VN-formatted strings.
  * 
- * @param {Date|string|null|undefined} date - Date to convert
- * @returns {Date|null} Date in Vietnam timezone or null if invalid
+ * @param {Date|string|null} input 
+ * @returns {Date|null}
  */
-export function toVietnamTimezone(date) {
-  if (!date) return null
+function parseDate(input) {
+  if (!input) return null
+  if (input instanceof Date) return isNaN(input.getTime()) ? null : input
   
-  try {
-    const d = date instanceof Date ? date : new Date(date)
-    if (isNaN(d.getTime())) return null
-    
-    // Get UTC time
-    const utcTime = d.getTime()
-    // Vietnam is UTC+7, so add 7 hours (7 * 60 * 60 * 1000 ms)
-    const vnOffset = 7 * 60 * 60 * 1000
-    const vnTime = new Date(utcTime + vnOffset)
-    
-    return vnTime
-  } catch (error) {
-    console.error('Error converting to Vietnam timezone:', error)
-    return null
+  // If already VN-formatted (dd/MM/yyyy HH:mm:ss), parse it
+  const vnMatch = input.match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/)
+  if (vnMatch) {
+    const [, day, month, year, hours, minutes, seconds] = vnMatch
+    // This is already a VN display time, create Date from it
+    // We treat it as UTC for internal use since it's display-only
+    return new Date(Date.UTC(
+      parseInt(year), parseInt(month) - 1, parseInt(day),
+      parseInt(hours), parseInt(minutes), parseInt(seconds)
+    ))
+  }
+  
+  const d = new Date(input)
+  return isNaN(d.getTime()) ? null : d
+}
+
+/**
+ * Convert a UTC Date to Vietnam time components.
+ * 
+ * @param {Date} date - UTC date
+ * @returns {{ year: number, month: number, day: number, hours: number, minutes: number, seconds: number }}
+ */
+function utcToVnComponents(date) {
+  // Add 7 hours to get VN time, use UTC methods to avoid local offset interference
+  const vnMs = date.getTime() + VN_OFFSET_MS
+  const vn = new Date(vnMs)
+  return {
+    year: vn.getUTCFullYear(),
+    month: vn.getUTCMonth() + 1,
+    day: vn.getUTCDate(),
+    hours: vn.getUTCHours(),
+    minutes: vn.getUTCMinutes(),
+    seconds: vn.getUTCSeconds()
   }
 }
 
 /**
- * Format datetime to Vietnam format: dd/MM/yyyy HH:mm:ss
+ * Format datetime to VN: dd/MM/yyyy HH:mm:ss
  * 
- * @param {Date|string|null|undefined} date - Date to format
- * @returns {string} Formatted datetime string or empty string if invalid
+ * Input: ISO UTC string from backend (e.g. "2026-02-10T03:15:00+00:00")
+ * Output: "10/02/2026 10:15:00" (Vietnam time)
  * 
- * @example
- * formatDateTimeVN('2026-01-26T07:30:45Z') // Returns "26/01/2026 14:30:45"
+ * @param {Date|string|null} date
+ * @returns {string}
  */
 export function formatDateTimeVN(date) {
-  // If input is already a VN-formatted string (dd/MM/yyyy HH:mm:ss), return it directly
+  // If already VN-formatted, return as-is
   if (typeof date === 'string' && /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/.test(date)) {
     return date
   }
   
-  const vnDate = toVietnamTimezone(date)
-  if (!vnDate) return ''
+  const d = parseDate(date)
+  if (!d) return ''
   
-  try {
-    // Use local date methods since vnDate is already in Vietnam timezone
-    const day = String(vnDate.getDate()).padStart(2, '0')
-    const month = String(vnDate.getMonth() + 1).padStart(2, '0')
-    const year = vnDate.getFullYear()
-    const hours = String(vnDate.getHours()).padStart(2, '0')
-    const minutes = String(vnDate.getMinutes()).padStart(2, '0')
-    const seconds = String(vnDate.getSeconds()).padStart(2, '0')
-    
-    return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`
-  } catch (error) {
-    console.error('Error formatting datetime:', error)
-    return ''
-  }
+  const c = utcToVnComponents(d)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(c.day)}/${pad(c.month)}/${c.year} ${pad(c.hours)}:${pad(c.minutes)}:${pad(c.seconds)}`
 }
 
 /**
- * Format date to Vietnam format: dd/MM/yyyy
+ * Format date to VN: dd/MM/yyyy
  * 
- * @param {Date|string|null|undefined} date - Date to format
- * @returns {string} Formatted date string or empty string if invalid
- * 
- * @example
- * formatDateVN('2026-01-26T07:30:45Z') // Returns "26/01/2026"
+ * @param {Date|string|null} date
+ * @returns {string}
  */
 export function formatDateVN(date) {
-  const vnDate = toVietnamTimezone(date)
-  if (!vnDate) return ''
+  const d = parseDate(date)
+  if (!d) return ''
   
-  try {
-    // Use local date methods since vnDate is already in Vietnam timezone
-    const day = String(vnDate.getDate()).padStart(2, '0')
-    const month = String(vnDate.getMonth() + 1).padStart(2, '0')
-    const year = vnDate.getFullYear()
-    
-    return `${day}/${month}/${year}`
-  } catch (error) {
-    console.error('Error formatting date:', error)
-    return ''
-  }
+  const c = utcToVnComponents(d)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(c.day)}/${pad(c.month)}/${c.year}`
 }
 
 /**
- * Format time to Vietnam format: HH:mm:ss
+ * Format time to VN: HH:mm:ss
  * 
- * @param {Date|string|null|undefined} date - Date to format
- * @returns {string} Formatted time string or empty string if invalid
- * 
- * @example
- * formatTimeVN('2026-01-26T07:30:45Z') // Returns "14:30:45"
+ * @param {Date|string|null} date
+ * @returns {string}
  */
 export function formatTimeVN(date) {
-  const vnDate = toVietnamTimezone(date)
-  if (!vnDate) return ''
+  const d = parseDate(date)
+  if (!d) return ''
   
-  try {
-    // Use local time methods since vnDate is already in Vietnam timezone
-    const hours = String(vnDate.getHours()).padStart(2, '0')
-    const minutes = String(vnDate.getMinutes()).padStart(2, '0')
-    const seconds = String(vnDate.getSeconds()).padStart(2, '0')
-    
-    return `${hours}:${minutes}:${seconds}`
-  } catch (error) {
-    console.error('Error formatting time:', error)
-    return ''
-  }
+  const c = utcToVnComponents(d)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(c.hours)}:${pad(c.minutes)}:${pad(c.seconds)}`
 }
 
 /**
- * Convert datetime from Vietnam timezone (UTC+7) to UTC for API submission.
+ * Convert datetime-local input (VN time) to UTC ISO string for API.
  * 
- * @param {Date|string|null|undefined} date - Date in Vietnam timezone
- * @returns {Date|null} Date in UTC or null if invalid
- */
-export function fromVietnamTimezone(date) {
-  if (!date) return null
-  
-  try {
-    const d = date instanceof Date ? date : new Date(date)
-    if (isNaN(d.getTime())) return null
-    
-    // If date is already a Date object from datetime-local input, it's in local timezone
-    // We need to treat it as Vietnam timezone and convert to UTC
-    // Get the time value
-    const timeValue = d.getTime()
-    // Get local timezone offset in minutes
-    const localOffset = d.getTimezoneOffset() * 60 * 1000
-    // Get Vietnam timezone offset (UTC+7 = -420 minutes)
-    const vnOffset = -7 * 60 * 60 * 1000
-    // Calculate UTC time: local time - local offset + VN offset
-    const utcTime = timeValue - localOffset + vnOffset
-    
-    return new Date(utcTime)
-  } catch (error) {
-    console.error('Error converting from Vietnam timezone:', error)
-    return null
-  }
-}
-
-/**
- * Convert datetime-local string (YYYY-MM-DDTHH:mm) from Vietnam timezone to UTC ISO string.
- * Used when submitting forms.
+ * Input: "2026-02-10T10:15" (user typed VN time)
+ * Output: "2026-02-10T03:15:00.000Z" (UTC for backend)
  * 
- * @param {string|null|undefined} datetimeLocal - Datetime-local string (e.g., "2026-01-26T14:30")
- * @returns {string|null} ISO string in UTC or null if invalid
+ * @param {string|null} datetimeLocal - "YYYY-MM-DDTHH:mm"
+ * @returns {string|null} ISO UTC string
  */
 export function datetimeLocalToUTC(datetimeLocal) {
   if (!datetimeLocal) return null
   
   try {
-    // Parse datetime-local as if it's in Vietnam timezone
-    // datetime-local format: YYYY-MM-DDTHH:mm
     const [datePart, timePart] = datetimeLocal.split('T')
     if (!datePart || !timePart) return null
     
     const [year, month, day] = datePart.split('-').map(Number)
     const [hours, minutes] = timePart.split(':').map(Number)
     
-    // Create date assuming it's in Vietnam timezone (UTC+7)
-    // We'll create a UTC date and subtract 7 hours
-    const vnDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0))
-    // Subtract 7 hours to get UTC
-    const utcDate = new Date(vnDate.getTime() - 7 * 60 * 60 * 1000)
+    // Create as UTC, then subtract 7h (because input is VN time)
+    const vnAsUtc = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0))
+    const utcDate = new Date(vnAsUtc.getTime() - VN_OFFSET_MS)
     
     return utcDate.toISOString()
   } catch (error) {
@@ -181,32 +140,46 @@ export function datetimeLocalToUTC(datetimeLocal) {
 }
 
 /**
- * Convert UTC ISO string to datetime-local string (YYYY-MM-DDTHH:mm) in Vietnam timezone.
- * Used when displaying datetime in input fields.
+ * Convert UTC ISO string to datetime-local string (VN time) for form inputs.
  * 
- * @param {string|Date|null|undefined} isoString - ISO string in UTC or Date object
- * @returns {string} Datetime-local string or empty string if invalid
+ * Input: "2026-02-10T03:15:00.000Z" (UTC from backend)
+ * Output: "2026-02-10T10:15" (VN time for <input type="datetime-local">)
+ * 
+ * @param {string|Date|null} isoString
+ * @returns {string} "YYYY-MM-DDTHH:mm"
  */
 export function utcToDatetimeLocal(isoString) {
   if (!isoString) return ''
   
   try {
-    const date = isoString instanceof Date ? isoString : new Date(isoString)
-    if (isNaN(date.getTime())) return ''
+    const d = parseDate(isoString)
+    if (!d) return ''
     
-    // Convert UTC to Vietnam timezone (add 7 hours)
-    const vnDate = new Date(date.getTime() + 7 * 60 * 60 * 1000)
-    
-    // Use local date methods since vnDate represents Vietnam timezone
-    const year = vnDate.getFullYear()
-    const month = String(vnDate.getMonth() + 1).padStart(2, '0')
-    const day = String(vnDate.getDate()).padStart(2, '0')
-    const hours = String(vnDate.getHours()).padStart(2, '0')
-    const minutes = String(vnDate.getMinutes()).padStart(2, '0')
-    
-    return `${year}-${month}-${day}T${hours}:${minutes}`
+    const c = utcToVnComponents(d)
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${c.year}-${pad(c.month)}-${pad(c.day)}T${pad(c.hours)}:${pad(c.minutes)}`
   } catch (error) {
     console.error('Error converting UTC to datetime-local:', error)
     return ''
   }
+}
+
+/**
+ * Convert Date to VN timezone Date object.
+ * @deprecated Use formatDateTimeVN() or utcToVnComponents() instead.
+ */
+export function toVietnamTimezone(date) {
+  const d = parseDate(date)
+  if (!d) return null
+  return new Date(d.getTime() + VN_OFFSET_MS)
+}
+
+/**
+ * Convert VN timezone Date to UTC Date.
+ * @deprecated Use datetimeLocalToUTC() instead.
+ */
+export function fromVietnamTimezone(date) {
+  const d = parseDate(date)
+  if (!d) return null
+  return new Date(d.getTime() - VN_OFFSET_MS)
 }

@@ -8,7 +8,11 @@
         <select
           :value="pageSize"
           @change="handlePageSizeChange($event.target.value)"
-          class="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm min-h-[44px] md:min-h-[38px] px-3 py-2.5 md:py-2 flex-1 md:flex-none"
+          :disabled="loading"
+          :class="[
+            'rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm min-h-[44px] md:min-h-[38px] px-3 py-2.5 md:py-2 flex-1 md:flex-none',
+            loading ? 'opacity-60 cursor-not-allowed' : ''
+          ]"
         >
           <option v-for="size in pageSizeOptions" :key="size" :value="size">
             {{ size }}
@@ -17,8 +21,13 @@
       </div>
 
       <!-- Page Info -->
-      <div class="text-xs md:text-sm text-gray-700 text-center md:text-left w-full md:w-auto">
-        Showing {{ startItem }} to {{ endItem }} of {{ total }} results
+      <div class="flex items-center gap-4 text-xs md:text-sm text-gray-700 text-center md:text-left w-full md:w-auto">
+        <div>
+          Showing {{ startItem }} to {{ endItem }} of {{ total }} results
+        </div>
+        <div v-if="totalPages > 1" class="font-medium text-gray-900">
+          Page {{ currentPage }} of {{ totalPages }}
+        </div>
       </div>
     </div>
 
@@ -27,13 +36,14 @@
       <!-- Previous Button -->
       <button
         @click="goToPage(currentPage - 1)"
-        :disabled="currentPage === 1"
+        :disabled="currentPage === 1 || loading"
         :class="[
           'px-3 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-colors min-h-[44px] md:min-h-[38px] whitespace-nowrap flex-shrink-0',
-          currentPage === 1
-            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+          (currentPage === 1 || loading)
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
             : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
         ]"
+        aria-label="Previous page"
       >
         Previous
       </button>
@@ -44,12 +54,17 @@
           v-for="page in visiblePages"
           :key="page"
           @click="goToPage(page)"
+          :disabled="loading"
           :class="[
             'px-3 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-colors min-w-[44px] md:min-w-[38px] min-h-[44px] md:min-h-[38px] flex-shrink-0',
             page === currentPage
               ? 'bg-primary-600 text-white'
-              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              : loading
+                ? 'bg-white text-gray-400 border border-gray-300 cursor-not-allowed opacity-60'
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
           ]"
+          :aria-label="`Go to page ${page}`"
+          :aria-current="page === currentPage ? 'page' : undefined"
         >
           {{ page }}
         </button>
@@ -58,13 +73,14 @@
       <!-- Next Button -->
       <button
         @click="goToPage(currentPage + 1)"
-        :disabled="currentPage === totalPages"
+        :disabled="currentPage === totalPages || loading"
         :class="[
           'px-3 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-colors min-h-[44px] md:min-h-[38px] whitespace-nowrap flex-shrink-0',
-          currentPage === totalPages
-            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+          (currentPage === totalPages || loading)
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
             : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
         ]"
+        aria-label="Next page"
       >
         Next
       </button>
@@ -73,7 +89,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
   currentPage: {
@@ -102,6 +118,10 @@ const props = defineProps({
   maxVisiblePages: {
     type: Number,
     default: 5
+  },
+  loading: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -151,15 +171,52 @@ const visiblePages = computed(() => {
 })
 
 const goToPage = (page) => {
+  if (props.loading) return
   if (page >= 1 && page <= totalPages.value && page !== props.currentPage) {
     emit('page-change', page)
   }
 }
 
 const handlePageSizeChange = (newSize) => {
+  if (props.loading) return
   const size = parseInt(newSize, 10)
   if (size !== props.pageSize) {
     emit('page-size-change', size)
   }
 }
+
+// Keyboard navigation
+const handleKeydown = (event) => {
+  // Only handle if pagination is visible and not loading
+  if (props.loading || totalPages.value <= 1) return
+  
+  // Only handle arrow keys if not typing in an input/textarea
+  const target = event.target
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    return
+  }
+  
+  switch (event.key) {
+    case 'ArrowLeft':
+      event.preventDefault()
+      if (props.currentPage > 1) {
+        goToPage(props.currentPage - 1)
+      }
+      break
+    case 'ArrowRight':
+      event.preventDefault()
+      if (props.currentPage < totalPages.value) {
+        goToPage(props.currentPage + 1)
+      }
+      break
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 </script>

@@ -7,22 +7,46 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Design System Colors from MASTER.md
         primary: {
+          DEFAULT: '#2563EB', // --color-primary
           50: '#f0f9ff',
           100: '#e0f2fe',
           200: '#bae6fd',
           300: '#7dd3fc',
           400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
+          500: '#2563EB', // Primary
+          600: '#1D4ED8',
           700: '#0369a1',
           800: '#075985',
           900: '#0c4a6e',
         },
         secondary: {
-          300: '#d1d5db',
-          400: '#9ca3af',
-          500: '#6b7280',
+          DEFAULT: '#3B82F6', // --color-secondary
+          300: '#93C5FD',
+          400: '#60A5FA',
+          500: '#3B82F6', // Secondary
+          600: '#2563EB',
+        },
+        cta: {
+          DEFAULT: '#F97316', // --color-cta
+          50: '#fff7ed',
+          100: '#ffedd5',
+          200: '#fed7aa',
+          300: '#fdba74',
+          400: '#fb923c',
+          500: '#F97316', // CTA/Accent
+          600: '#ea580c',
+          700: '#c2410c',
+        },
+        background: {
+          DEFAULT: '#F8FAFC', // --color-background
+        },
+        text: {
+          DEFAULT: '#1E293B', // --color-text
+        },
+        border: {
+          DEFAULT: '#E2E8F0', // --color-border
         },
         success: '#10b981',
         warning: '#f59e0b',
@@ -42,6 +66,12 @@ export default {
         },
       },
       boxShadow: {
+        // Design System Shadows from MASTER.md
+        'sm': '0 1px 2px rgba(0,0,0,0.05)', // --shadow-sm: Subtle lift
+        'md': '0 4px 6px rgba(0,0,0,0.1)', // --shadow-md: Cards, buttons
+        'lg': '0 10px 15px rgba(0,0,0,0.1)', // --shadow-lg: Modals, dropdowns
+        'xl': '0 20px 25px rgba(0,0,0,0.15)', // --shadow-xl: Hero images, featured cards
+        // Legacy shadows (keep for backward compatibility)
         'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
         'medium': '0 4px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         'large': '0 10px 40px -10px rgba(0, 0, 0, 0.2)',
@@ -71,7 +101,9 @@ export default {
         },
       },
       fontFamily: {
+        // Design System Typography: Inter from MASTER.md
         sans: [
+          "Inter",
           "-apple-system",
           "BlinkMacSystemFont",
           "'Segoe UI'",

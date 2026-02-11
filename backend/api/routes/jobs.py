@@ -126,9 +126,15 @@ async def create_job(job_data: dict):
         sanitized_data = sanitize_job_input(job_data)
         
         jobs_api = get_jobs_api()
+        
+        # Handle account_id: convert None/empty to None
+        account_id = sanitized_data.get("account_id")
+        if account_id == "" or account_id is None:
+            account_id = None
+        
         job_id = jobs_api.add_job(
             content=sanitized_data.get("content"),
-            account_id=sanitized_data.get("account_id"),
+            account_id=account_id,
             platform=sanitized_data.get("platform", "threads"),
             scheduled_time=sanitized_data.get("scheduled_time"),
             priority=sanitized_data.get("priority", "normal"),
