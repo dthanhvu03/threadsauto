@@ -33,7 +33,13 @@ export function useScheduler() {
       // API client already extracts data from success response
       const status = await schedulerService.getStatus()
       
-      store.setStatus(status || { running: false, activeJobsCount: 0 })
+      // Map snake_case from API to camelCase for frontend
+      const mappedStatus = status ? {
+        running: status.running,
+        activeJobsCount: status.active_jobs_count ?? status.activeJobsCount ?? 0
+      } : { running: false, activeJobsCount: 0 }
+      
+      store.setStatus(mappedStatus)
       
       return status
     } catch (err) {
@@ -57,12 +63,20 @@ export function useScheduler() {
 
     try {
       // API client already extracts data from success response
-      const jobs = await schedulerService.getActiveJobs()
+      // But when meta is present, it returns {data: [...], _meta: {...}} instead of array
+      const response = await schedulerService.getActiveJobs()
       
-      const jobsArray = Array.isArray(jobs) ? jobs : []
+      // Handle both array and wrapped response formats
+      let jobsArray = []
+      if (Array.isArray(response)) {
+        jobsArray = response
+      } else if (response && Array.isArray(response.data)) {
+        jobsArray = response.data
+      }
+      
       store.setActiveJobs(jobsArray)
       
-      return jobs
+      return jobsArray
     } catch (err) {
       const errorMessage = getErrorMessage(err)
       error.value = errorMessage

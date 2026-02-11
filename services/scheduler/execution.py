@@ -24,7 +24,7 @@ from typing import Dict, Callable, Any
 # Local
 from services.logger import StructuredLogger
 from services.exceptions import StorageError
-from services.scheduler.models import ScheduledJob, JobStatus, Platform
+from services.scheduler.models import ScheduledJob, JobStatus, Platform, JobType
 from services.safety_guard import RiskLevel, get_shared_safety_guard
 from utils.exception_utils import (
     safe_get_exception_type_name,
@@ -100,41 +100,44 @@ class JobExecutor:
                                   Callback nhận (account_id, content, status_updater)
         """
         # --- SAFETY CHECK TRƯỚC KHI CHẠY JOB ---
-        allowed, safety_error, risk_level = self.safety_guard.can_post(job.account_id, job.content)
-        if not allowed:
-            # Block job theo SafetyGuard
-            job.status = JobStatus.FAILED
-            job.error = safety_error
-            job.status_message = f"❌ Bị chặn bởi SafetyGuard (risk={risk_level.value}): {safety_error}"
-            job.completed_at = datetime.now()
+        # Chỉ check safety guard cho POST jobs, engagement jobs có safety guard riêng
+        job_type = getattr(job, 'job_type', JobType.POST)
+        if job_type == JobType.POST:
+            allowed, safety_error, risk_level = self.safety_guard.can_post(job.account_id, job.content)
+            if not allowed:
+                # Block job theo SafetyGuard
+                job.status = JobStatus.FAILED
+                job.error = safety_error
+                job.status_message = f"❌ Bị chặn bởi SafetyGuard (risk={risk_level.value}): {safety_error}"
+                job.completed_at = datetime.now()
 
-            # Ghi nhận high-risk nếu mức độ cao
-            if risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
-                self.safety_guard.record_high_risk_event(job.account_id, "scheduler_post_blocked")
+                # Ghi nhận high-risk nếu mức độ cao
+                if risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
+                    self.safety_guard.record_high_risk_event(job.account_id, "scheduler_post_blocked")
 
-            self.logger.log_step(
-                step="RUN_JOB_SAFETY_CHECK",
-                result="BLOCKED",
-                job_id=job.job_id,
-                account_id=job.account_id,
-                error=safety_error,
-                risk_level=risk_level.value,
-                status_message=job.status_message
-            )
-
-            # Save ngay để UI thấy trạng thái
-            try:
-                self.save_jobs()
-                self._last_save_time = datetime.now()
-            except StorageError as e:
                 self.logger.log_step(
                     step="RUN_JOB_SAFETY_CHECK",
-                    result="WARNING",
+                    result="BLOCKED",
                     job_id=job.job_id,
-                    error=f"Failed to save blocked job: {safe_get_exception_message(e)}",
-                    error_type=safe_get_exception_type_name(e)
+                    account_id=job.account_id,
+                    error=safety_error,
+                    risk_level=risk_level.value,
+                    status_message=job.status_message
                 )
-            return
+
+                # Save ngay để UI thấy trạng thái
+                try:
+                    self.save_jobs()
+                    self._last_save_time = datetime.now()
+                except StorageError as e:
+                    self.logger.log_step(
+                        step="RUN_JOB_SAFETY_CHECK",
+                        result="WARNING",
+                        job_id=job.job_id,
+                        error=f"Failed to save blocked job: {safe_get_exception_message(e)}",
+                        error_type=safe_get_exception_type_name(e)
+                    )
+                return
 
         # --- BẮT ĐẦU THỰC THI JOB ---
         job.status = JobStatus.RUNNING
@@ -171,21 +174,94 @@ class JobExecutor:
                 status_message=job.status_message
             )
             
-            # Tạo status updater callback để pass vào post_callback
+            # Tạo status updater callback để pass vào callback
             def status_updater(message: str) -> None:
                 """Update job status message."""
                 self._update_job_status(job, message)
             
-            # Lấy callback dựa trên platform của job
-            platform = getattr(job, 'platform', Platform.THREADS)
-            post_callback = post_callback_factory(platform)
+            # Phân biệt job type: POST hoặc ENGAGEMENT
+            job_type = getattr(job, 'job_type', JobType.POST)
             
-            # Lấy link_aff từ job (nếu có)
-            link_aff = getattr(job, 'link_aff', None)
-            
-            # Gọi callback để đăng bài (pass status_updater và link_aff)
-            # Note: post_thread_callback và post_facebook_callback đã được sửa để nhận link_aff (optional)
-            result = await post_callback(job.account_id, job.content, status_updater, link_aff)
+            if job_type == JobType.ENGAGEMENT:
+                # Engagement job: Parse engagement_data và gọi engagement callback
+                import json
+                engagement_data = getattr(job, 'engagement_data', None)
+                if not engagement_data:
+                    raise ValueError(f"Engagement job {job.job_id} missing engagement_data")
+                
+                # Parse engagement_data nếu là string
+                if isinstance(engagement_data, str):
+                    engagement_data = json.loads(engagement_data)
+                
+                action_type = engagement_data.get('action_type', '').lower()
+                
+                # Import engagement callback factory
+                try:
+                    from backend.app.modules.scheduler.utils.engagement_callback_factory import create_engagement_callback_factory
+                    engagement_callback_factory = create_engagement_callback_factory()
+                    engagement_callback = engagement_callback_factory(action_type)
+                except ImportError:
+                    # Fallback: Import directly from threads.engagement.callbacks
+                    from threads.engagement.callbacks import like_callback, comment_callback, follow_callback
+                    from threads.engagement.types import EngagementAction
+                    
+                    if action_type == 'like':
+                        engagement_callback = like_callback
+                    elif action_type == 'comment':
+                        engagement_callback = comment_callback
+                    elif action_type == 'follow':
+                        engagement_callback = follow_callback
+                    else:
+                        raise ValueError(f"Unknown engagement action_type: {action_type}")
+                
+                # Prepare criteria from engagement_data
+                if action_type == 'like':
+                    from threads.engagement.types import LikeCriteria
+                    criteria = LikeCriteria(**engagement_data.get('like_criteria', {}))
+                    result = await engagement_callback(job.account_id, criteria, status_updater)
+                elif action_type == 'comment':
+                    from threads.engagement.types import CommentCriteria
+                    criteria = CommentCriteria(**engagement_data.get('comment_criteria', {}))
+                    result = await engagement_callback(job.account_id, criteria, status_updater)
+                elif action_type == 'follow':
+                    from threads.engagement.types import FollowCriteria
+                    criteria = FollowCriteria(**engagement_data.get('follow_criteria', {}))
+                    result = await engagement_callback(job.account_id, criteria, status_updater)
+                else:
+                    raise ValueError(f"Unknown engagement action_type: {action_type}")
+                
+                # Engagement callbacks return List[EngagementResult] hoặc EngagementResult
+                # Convert to compatible format
+                if isinstance(result, list):
+                    # List of results - check if all succeeded
+                    success_count = sum(1 for r in result if r.success)
+                    total_count = len(result)
+                    success = success_count > 0
+                    # Create a simple result object
+                    from types import SimpleNamespace
+                    result = SimpleNamespace(
+                        success=success,
+                        thread_id=None,
+                        error=None if success else f"Only {success_count}/{total_count} actions succeeded"
+                    )
+                elif hasattr(result, 'success'):
+                    # Single EngagementResult
+                    from types import SimpleNamespace
+                    result = SimpleNamespace(
+                        success=result.success,
+                        thread_id=result.target_id,
+                        error=result.error
+                    )
+            else:
+                # POST job: Use existing post callback
+                platform = getattr(job, 'platform', Platform.THREADS)
+                post_callback = post_callback_factory(platform)
+                
+                # Lấy link_aff từ job (nếu có)
+                link_aff = getattr(job, 'link_aff', None)
+                
+                # Gọi callback để đăng bài (pass status_updater và link_aff)
+                result = await post_callback(job.account_id, job.content, status_updater, link_aff)
             
             # Validate result object
             if not hasattr(result, 'success'):

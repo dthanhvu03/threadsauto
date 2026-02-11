@@ -1,0 +1,15 @@
+{
+  "name": "threads-automation-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Node.js scripts for Threads automation",
+  "scripts": {
+    "extract-feed": "node threads_feed_extractor.js"
+  },
+  "dependencies": {
+    "playwright": ">=1.40.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

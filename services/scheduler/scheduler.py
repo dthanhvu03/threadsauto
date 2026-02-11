@@ -540,7 +540,7 @@ class Scheduler:
     # Job management methods (delegate to JobManager)
     def add_job(
         self,
-        account_id: str,
+        account_id: Optional[str],
         content: str,
         scheduled_time: datetime,
         priority: JobPriority = JobPriority.NORMAL,

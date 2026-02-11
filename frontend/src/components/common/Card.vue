@@ -28,24 +28,25 @@ const props = defineProps({
 })
 
 const cardClasses = computed(() => {
-  // Border Radius: Mobile rounded-lg (8px), Tablet rounded-lg (8px), Desktop rounded-xl (12px)
-  // Shadow: Mobile shadow-sm, Tablet shadow, Desktop shadow-md
+  // Design System: background #F8FAFC, border-radius 12px, shadow-md, transition all 200ms ease, cursor pointer from MASTER.md
   const shadowClass = props.shadow 
-    ? 'shadow-sm md:shadow lg:shadow-md' 
+    ? 'shadow-md hover:shadow-lg' 
     : ''
   return [
-    'bg-white rounded-lg lg:rounded-xl border border-gray-200',
+    'bg-background rounded-xl border border-border',
+    'transition-all duration-200 cursor-pointer',
+    'hover:-translate-y-0.5', // translateY(-2px) = -translate-y-0.5
     shadowClass
   ].filter(Boolean).join(' ')
 })
 
 const bodyClasses = computed(() => {
-  // Padding: Mobile p-3 (12px), Tablet p-4 (16px), Desktop p-6 (24px)
+  // Design System: padding 24px (1.5rem) from MASTER.md, with responsive variants
   const paddings = {
     none: '',
     sm: 'p-2 md:p-3 lg:p-4',      // 8px / 12px / 16px
-    md: 'p-3 md:p-4 lg:p-6',      // 12px / 16px / 24px
-    lg: 'p-4 md:p-6 lg:p-8'       // 16px / 24px / 32px
+    md: 'p-4 md:p-5 lg:p-6',      // 16px / 20px / 24px (design system default)
+    lg: 'p-6 md:p-8 lg:p-10'      // 24px / 32px / 40px
   }
   return paddings[props.padding]
 })

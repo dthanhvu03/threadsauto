@@ -1,7 +1,10 @@
 <template>
   <div>
     <div class="mb-4 md:mb-6">
-      <h1 class="text-xl md:text-2xl font-semibold text-gray-900 mb-1">⚙️ Configuration</h1>
+      <h1 class="text-xl md:text-2xl font-semibold text-gray-900 mb-1 flex items-center gap-2">
+        <Cog6ToothIcon class="w-6 h-6 md:w-7 md:h-7" aria-hidden="true" />
+        Configuration
+      </h1>
       <p class="text-xs md:text-sm text-gray-600">Manage application settings</p>
     </div>
 
@@ -26,7 +29,8 @@
       <div class="border-b border-gray-200">
         <nav 
           class="-mb-px flex space-x-4 md:space-x-8 px-4 md:px-6 overflow-x-auto scrollbar-hide" 
-          aria-label="Tabs"
+          role="tablist"
+          aria-label="Configuration tabs"
           style="scrollbar-width: none; -ms-overflow-style: none;"
         >
           <button
@@ -34,11 +38,15 @@
             :key="tab.id"
             @click="activeTab = tab.id"
             :class="[
-              'whitespace-nowrap py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-sm transition-colors flex-shrink-0',
+              'whitespace-nowrap py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-sm transition-colors flex-shrink-0 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
               activeTab === tab.id
                 ? 'border-primary-500 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             ]"
+            :role="'tab'"
+            :aria-selected="activeTab === tab.id"
+            :aria-controls="`tab-panel-${tab.id}`"
+            :id="`tab-${tab.id}`"
           >
             {{ tab.label }}
           </button>
@@ -46,9 +54,15 @@
       </div>
 
       <!-- Tab Content -->
-      <form @submit.prevent="handleSave" class="p-4 md:p-6">
+      <form @submit.prevent="handleSave" class="p-4 md:p-6" aria-label="Configuration form">
         <!-- General Tab -->
-        <div v-show="activeTab === 'general'" class="space-y-4 md:space-y-6">
+        <div 
+          v-show="activeTab === 'general'" 
+          :id="'tab-panel-general'"
+          role="tabpanel"
+          :aria-labelledby="'tab-general'"
+          class="space-y-4 md:space-y-6"
+        >
           <div>
             <FormSelect
               v-model="config.run_mode"
@@ -90,7 +104,13 @@
         </div>
 
         <!-- Browser Tab -->
-        <div v-show="activeTab === 'browser'" class="space-y-4 md:space-y-6">
+        <div 
+          v-show="activeTab === 'browser'" 
+          :id="'tab-panel-browser'"
+          role="tabpanel"
+          :aria-labelledby="'tab-browser'"
+          class="space-y-4 md:space-y-6"
+        >
           <FormCheckbox
             v-model="config.browser.headless"
             label="Headless Mode"
@@ -180,7 +200,13 @@
         </div>
 
         <!-- Anti-Detection Tab -->
-        <div v-show="activeTab === 'anti_detection'" class="space-y-4 md:space-y-6">
+        <div 
+          v-show="activeTab === 'anti_detection'" 
+          :id="'tab-panel-anti_detection'"
+          role="tabpanel"
+          :aria-labelledby="'tab-anti_detection'"
+          class="space-y-4 md:space-y-6"
+        >
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
               Min Delay (seconds)
@@ -242,7 +268,13 @@
         </div>
 
         <!-- Safety Tab -->
-        <div v-show="activeTab === 'safety'" class="space-y-4 md:space-y-6">
+        <div 
+          v-show="activeTab === 'safety'" 
+          :id="'tab-panel-safety'"
+          role="tabpanel"
+          :aria-labelledby="'tab-safety'"
+          class="space-y-4 md:space-y-6"
+        >
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
               Max Posts Per Day
@@ -316,7 +348,13 @@
         </div>
 
         <!-- Scheduler Tab -->
-        <div v-show="activeTab === 'scheduler'" class="space-y-4 md:space-y-6">
+        <div 
+          v-show="activeTab === 'scheduler'" 
+          :id="'tab-panel-scheduler'"
+          role="tabpanel"
+          :aria-labelledby="'tab-scheduler'"
+          class="space-y-4 md:space-y-6"
+        >
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
               Max Retries
@@ -386,15 +424,23 @@
         </div>
 
         <!-- Platform URLs Tab -->
-        <div v-show="activeTab === 'platform'" class="space-y-4 md:space-y-6">
+        <div 
+          v-show="activeTab === 'platform'" 
+          :id="'tab-panel-platform'"
+          role="tabpanel"
+          :aria-labelledby="'tab-platform'"
+          class="space-y-4 md:space-y-6"
+        >
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
               Threads Base URL
             </label>
             <FormInput
               v-model="config.platform.threads_base_url"
-              type="text"
+              type="url"
               placeholder="https://www.threads.com/?hl=vi"
+              autocomplete="url"
+              spellcheck="false"
             />
           </div>
 
@@ -404,8 +450,10 @@
             </label>
             <FormInput
               v-model="config.platform.threads_compose_url"
-              type="text"
+              type="url"
               placeholder="https://www.threads.com/?hl=vi/compose"
+              autocomplete="url"
+              spellcheck="false"
             />
           </div>
 
@@ -415,8 +463,10 @@
             </label>
             <FormInput
               v-model="config.platform.threads_login_url"
-              type="text"
+              type="url"
               placeholder="https://threads.net/login"
+              autocomplete="url"
+              spellcheck="false"
             />
           </div>
 
@@ -426,8 +476,10 @@
             </label>
             <FormInput
               v-model="config.platform.threads_profile_url"
-              type="text"
+              type="url"
               placeholder="https://www.threads.com/"
+              autocomplete="url"
+              spellcheck="false"
             />
           </div>
 
@@ -437,8 +489,10 @@
             </label>
             <FormInput
               v-model="config.platform.threads_post_url_template"
-              type="text"
+              type="url"
               placeholder="https://www.threads.com/@{username}/post/{thread_id}"
+              autocomplete="url"
+              spellcheck="false"
             />
           </div>
 
@@ -448,8 +502,10 @@
             </label>
             <FormInput
               v-model="config.platform.threads_post_fallback_template"
-              type="text"
+              type="url"
               placeholder="https://www.threads.com/post/{thread_id}"
+              autocomplete="url"
+              spellcheck="false"
             />
           </div>
 
@@ -459,14 +515,22 @@
             </label>
             <FormInput
               v-model="config.platform.facebook_url"
-              type="text"
+              type="url"
               placeholder="https://www.facebook.com"
+              autocomplete="url"
+              spellcheck="false"
             />
           </div>
         </div>
 
         <!-- Analytics Tab -->
-        <div v-show="activeTab === 'analytics'" class="space-y-4 md:space-y-6">
+        <div 
+          v-show="activeTab === 'analytics'" 
+          :id="'tab-panel-analytics'"
+          role="tabpanel"
+          :aria-labelledby="'tab-analytics'"
+          class="space-y-4 md:space-y-6"
+        >
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
               Fetch Metrics Timeout (seconds)
@@ -601,14 +665,34 @@
 
         <!-- Action Buttons -->
         <div class="flex flex-col md:flex-row justify-end space-y-2 md:space-y-0 md:space-x-3 pt-4 md:pt-6 border-t border-gray-200 mt-4 md:mt-6">
-          <Button variant="outline" type="button" @click="handleReset" class="w-full md:w-auto">Reset</Button>
-          <Button type="submit" :loading="loading" class="w-full md:w-auto">Save Changes</Button>
+          <Button 
+            variant="outline" 
+            type="button" 
+            @click="handleReset" 
+            class="w-full md:w-auto"
+            :disabled="loading"
+            aria-label="Reset configuration to saved values"
+          >
+            <ArrowPathIcon class="w-4 h-4 mr-1.5" aria-hidden="true" />
+            Reset
+          </Button>
+          <Button 
+            type="submit" 
+            :loading="loading" 
+            :disabled="loading"
+            class="w-full md:w-auto"
+            aria-label="Save configuration changes"
+          >
+            <CheckIcon v-if="!loading" class="w-4 h-4 mr-1.5" aria-hidden="true" />
+            Save Changes
+          </Button>
         </div>
       </form>
     </Card>
 
-    <div v-if="loading" class="flex justify-center py-12">
+    <div v-if="loading" class="flex justify-center py-12" role="status" aria-live="polite">
       <LoadingSpinner size="lg" />
+      <span class="sr-only">Loading configuration...</span>
     </div>
   </div>
 </template>
@@ -623,6 +707,11 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import FormInput from '@/components/common/FormInput.vue'
 import FormSelect from '@/components/common/FormSelect.vue'
 import FormCheckbox from '@/components/common/FormCheckbox.vue'
+import { 
+  Cog6ToothIcon, 
+  ArrowPathIcon, 
+  CheckIcon 
+} from '@heroicons/vue/24/outline'
 
 const {
   config: storeConfig,
@@ -755,9 +844,15 @@ const handleSave = async () => {
 }
 
 const handleReset = async () => {
-  const configData = await fetchConfig()
-  if (configData) {
-    loadConfigToForm(configData)
+  // Confirmation dialog for reset action (UX guidelines)
+  const confirmed = window.confirm(
+    'Are you sure you want to reset all changes? This will discard any unsaved modifications and reload the saved configuration.'
+  )
+  if (confirmed) {
+    const configData = await fetchConfig()
+    if (configData) {
+      loadConfigToForm(configData)
+    }
   }
 }
 

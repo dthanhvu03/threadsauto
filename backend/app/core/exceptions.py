@@ -122,3 +122,35 @@ class InternalError(APIException):
             details=details,
             status_code=500
         )
+
+
+class TimeoutError(APIException):
+    """Timeout error (504)."""
+    
+    def __init__(
+        self,
+        operation: str,
+        timeout: int,
+        elapsed_time: Optional[int] = None,
+        message: Optional[str] = None
+    ):
+        """
+        Initialize timeout error.
+        
+        Args:
+            operation: Operation name that timed out
+            timeout: Timeout value in milliseconds
+            elapsed_time: Actual elapsed time in milliseconds (optional)
+            message: Optional custom error message
+        """
+        error_message = message or f'Operation "{operation}" timed out after {timeout}ms'
+        super().__init__(
+            error_code="TIMEOUT_ERROR",
+            message=error_message,
+            details={
+                "timeout": timeout,
+                "operation": operation,
+                "elapsedTime": elapsed_time or timeout
+            },
+            status_code=504
+        )

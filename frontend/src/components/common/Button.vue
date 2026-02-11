@@ -48,14 +48,17 @@ const props = defineProps({
 defineEmits(['click'])
 
 const buttonClasses = computed(() => {
-  const base = 'inline-flex items-center justify-center font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1'
+  // Design System: border-radius 8px, font-weight 600, transition all 200ms ease from MASTER.md
+  const base = 'inline-flex items-center justify-center font-semibold rounded-lg focus:outline-none cursor-pointer'
   
   const variants = {
-    primary: 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 disabled:bg-gray-400',
-    secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500 disabled:bg-gray-100',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 disabled:bg-gray-400',
-    success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 disabled:bg-gray-400',
-    outline: 'border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500 disabled:border-gray-200'
+    // Design System: Primary uses CTA color (#F97316) from MASTER.md
+    primary: 'bg-cta text-white hover:opacity-90 hover:-translate-y-px focus:ring-cta focus:ring-2 focus:ring-offset-1 disabled:bg-gray-400 transition-all duration-200',
+    // Design System: Secondary uses primary color (#2563EB) from MASTER.md
+    secondary: 'bg-transparent text-primary border-2 border-primary hover:bg-primary/10 focus:ring-primary focus:ring-2 focus:ring-offset-1 disabled:border-gray-200 disabled:text-gray-400 transition-all duration-200',
+    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 focus:ring-2 focus:ring-offset-1 disabled:bg-gray-400 transition-all duration-200',
+    success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 focus:ring-2 focus:ring-offset-1 disabled:bg-gray-400 transition-all duration-200',
+    outline: 'border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500 focus:ring-2 focus:ring-offset-1 disabled:border-gray-200 transition-all duration-200'
   }
   
   const sizes = {

@@ -164,7 +164,9 @@ import {
   ClockIcon,
   UserIcon,
   Cog6ToothIcon,
-  AdjustmentsHorizontalIcon
+  AdjustmentsHorizontalIcon,
+  HeartIcon,
+  RssIcon
 } from '@heroicons/vue/24/outline'
 import { useAccountsStore } from '@/stores/accounts'
 import { useDashboardStore } from '@/features/dashboard/store/dashboardStore'
@@ -226,7 +228,9 @@ const iconMap = {
   ClockIcon,
   UserIcon,
   Cog6ToothIcon,
-  AdjustmentsHorizontalIcon
+  AdjustmentsHorizontalIcon,
+  HeartIcon,
+  RssIcon
 }
 
 // Navigation structure with sections and badges
@@ -260,6 +264,14 @@ const navigationItems = [
     path: 'scheduler', 
     label: 'Lịch trình',
     icon: 'ClockIcon',
+    section: 'main',
+    badge: null
+  },
+  { 
+    name: 'feed-explorer', 
+    path: 'feed-explorer', 
+    label: 'Feed Explorer',
+    icon: 'RssIcon',
     section: 'main',
     badge: null
   },

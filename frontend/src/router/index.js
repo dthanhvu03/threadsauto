@@ -7,6 +7,7 @@ import Scheduler from '@/views/Scheduler.vue'
 import Accounts from '@/views/Accounts.vue'
 import Config from '@/views/Config.vue'
 import Selectors from '@/views/Selectors.vue'
+import FeedExplorer from '@/views/FeedExplorer.vue'
 
 const routes = [
   {
@@ -54,6 +55,12 @@ const routes = [
         name: 'selectors',
         component: Selectors,
         meta: { title: 'Selectors' }
+      },
+      {
+        path: 'feed-explorer',
+        name: 'feed-explorer',
+        component: FeedExplorer,
+        meta: { title: 'Feed Explorer' }
       }
     ]
   }

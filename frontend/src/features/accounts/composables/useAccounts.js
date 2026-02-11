@@ -31,9 +31,17 @@ export function useAccounts() {
 
     try {
       // API client already extracts data from success response
-      const accounts = await accountsService.getAll()
-      store.setAccounts(Array.isArray(accounts) ? accounts : [])
-      return accounts
+      // But axios interceptor may wrap array in object: {data: [...], _pagination: ..., _meta: ...}
+      const response = await accountsService.getAll()
+      // Handle both array response and wrapped object response
+      let accountsArray = []
+      if (Array.isArray(response)) {
+        accountsArray = response
+      } else if (response && typeof response === 'object' && Array.isArray(response.data)) {
+        accountsArray = response.data
+      }
+      store.setAccounts(accountsArray)
+      return accountsArray
     } catch (err) {
       const errorMessage = getErrorMessage(err)
       error.value = errorMessage

@@ -199,6 +199,8 @@ class MySQLJobStorage(JobStorageBase):
                         priority,
                         status,
                         platform,
+                        job_type,
+                        engagement_data,
                         max_retries,
                         retry_count,
                         created_at,
@@ -443,13 +445,33 @@ class MySQLJobStorage(JobStorageBase):
         Raises:
             pymysql.Error: Nếu SQL execution fails
         """
+        # Prepare engagement_data as JSON string
+        import json
+        engagement_data_json = None
+        if hasattr(job, 'engagement_data') and job.engagement_data:
+            try:
+                engagement_data_json = json.dumps(job.engagement_data, ensure_ascii=False)
+            except (TypeError, ValueError):
+                engagement_data_json = None
+        
+        # Get job_type value
+        job_type_value = getattr(job, 'job_type', None)
+        if job_type_value:
+            if hasattr(job_type_value, 'value'):
+                job_type_value = job_type_value.value
+            else:
+                job_type_value = str(job_type_value)
+        else:
+            job_type_value = 'post'  # Default to post for backward compatibility
+        
         cursor.execute("""
             INSERT INTO jobs (
                 job_id, account_id, content, scheduled_time, priority, status,
-                platform, max_retries, retry_count, created_at, started_at,
-                completed_at, error, thread_id, status_message, link_aff
+                platform, job_type, engagement_data, max_retries, retry_count, 
+                created_at, started_at, completed_at, error, thread_id, 
+                status_message, link_aff
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             )
             ON DUPLICATE KEY UPDATE
                 account_id = VALUES(account_id),
@@ -458,6 +480,8 @@ class MySQLJobStorage(JobStorageBase):
                 priority = VALUES(priority),
                 status = VALUES(status),
                 platform = VALUES(platform),
+                job_type = VALUES(job_type),
+                engagement_data = VALUES(engagement_data),
                 max_retries = VALUES(max_retries),
                 retry_count = VALUES(retry_count),
                 started_at = VALUES(started_at),
@@ -474,6 +498,8 @@ class MySQLJobStorage(JobStorageBase):
             job.priority.value,
             job.status.value,
             job.platform.value,
+            job_type_value,
+            engagement_data_json,
             job.max_retries,
             job.retry_count,
             job.created_at,
@@ -511,6 +537,8 @@ class MySQLJobStorage(JobStorageBase):
                         priority,
                         status,
                         platform,
+                        job_type,
+                        engagement_data,
                         max_retries,
                         retry_count,
                         created_at,
@@ -588,6 +616,8 @@ class MySQLJobStorage(JobStorageBase):
                         priority,
                         status,
                         platform,
+                        job_type,
+                        engagement_data,
                         max_retries,
                         retry_count,
                         created_at,
@@ -685,6 +715,8 @@ class MySQLJobStorage(JobStorageBase):
                             priority,
                             status,
                             platform,
+                            job_type,
+                            engagement_data,
                             max_retries,
                             retry_count,
                             created_at,
@@ -708,6 +740,8 @@ class MySQLJobStorage(JobStorageBase):
                             priority,
                             status,
                             platform,
+                            job_type,
+                            engagement_data,
                             max_retries,
                             retry_count,
                             created_at,
@@ -808,6 +842,34 @@ class MySQLJobStorage(JobStorageBase):
             else:
                 platform = Platform.THREADS
             
+            # Parse job_type (backward compatible - default to POST)
+            from services.scheduler.models import JobType
+            job_type_value = row.get('job_type', 'post')
+            if isinstance(job_type_value, str):
+                try:
+                    job_type = JobType(job_type_value)
+                except ValueError:
+                    job_type = JobType.POST  # Default to POST for backward compatibility
+            elif isinstance(job_type_value, JobType):
+                job_type = job_type_value
+            else:
+                job_type = JobType.POST
+            
+            # Parse engagement_data (JSON string to dict)
+            engagement_data = None
+            engagement_data_raw = row.get('engagement_data')
+            if engagement_data_raw:
+                if isinstance(engagement_data_raw, str):
+                    try:
+                        import json
+                        engagement_data = json.loads(engagement_data_raw)
+                    except (json.JSONDecodeError, TypeError):
+                        engagement_data = None
+                elif isinstance(engagement_data_raw, dict):
+                    engagement_data = engagement_data_raw
+                else:
+                    engagement_data = None
+            
             # Parse datetime fields
             # pymysql với DictCursor returns datetime objects, not strings
             scheduled_time = row['scheduled_time']
@@ -851,6 +913,8 @@ class MySQLJobStorage(JobStorageBase):
                 priority=priority,
                 status=status,
                 platform=platform,
+                job_type=job_type,
+                engagement_data=engagement_data,
                 max_retries=row.get('max_retries', 3),
                 retry_count=row.get('retry_count', 0),
                 created_at=created_at,

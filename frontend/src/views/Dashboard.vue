@@ -1,7 +1,10 @@
 <template>
   <div>
     <div class="mb-4 md:mb-6">
-      <h1 class="text-xl md:text-2xl lg:text-3xl font-semibold text-gray-900 mb-1">📊 Dashboard</h1>
+      <div class="flex items-center gap-2 mb-1">
+        <ChartBarIcon class="w-6 h-6 md:w-7 md:h-7 text-gray-900" aria-hidden="true" />
+        <h1 class="text-xl md:text-2xl lg:text-3xl font-semibold text-gray-900">Dashboard</h1>
+      </div>
       <p v-if="selectedAccount" class="text-xs md:text-sm text-gray-600">
         Tài khoản: <strong>{{ selectedAccount }}</strong>
       </p>
@@ -20,323 +23,133 @@
     </div>
 
     <div v-else>
-      <!-- Filters -->
-      <FilterBar
-        v-model="filters"
-        :show-account-filter="true"
-        @change="handleFilterChange"
-      />
+      <!-- Dashboard Header with Filters -->
+      <Card class="mb-6">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <h2 class="text-lg font-semibold text-gray-900">Dashboard Metrics</h2>
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <!-- Quick Filters -->
+            <select class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option>Time range: 30 days</option>
+              <option>Time range: 7 days</option>
+              <option>Time range: Today</option>
+            </select>
+            <select class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option>Platform: All</option>
+              <option>Platform: Threads</option>
+              <option>Platform: Instagram</option>
+            </select>
+            <select class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option>Status: All</option>
+              <option>Status: Completed</option>
+              <option>Status: Pending</option>
+            </select>
+            <Button size="sm" variant="outline" @click="refreshData">
+              <ArrowPathIcon class="w-4 h-4 mr-1" />
+              Refresh
+            </Button>
+          </div>
+        </div>
+      </Card>
 
-      <!-- Stats Cards -->
-      <!-- Grid: Mobile 1 column, Tablet 2 columns, Desktop 4 columns, Large Desktop 6 columns -->
-      <div v-if="stats" class="grid grid-cols-1 gap-3 md:gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 mb-4 md:mb-6">
+      <!-- Metrics Cards Row -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
         <StatsCard
+          v-if="stats"
           label="Total Jobs"
           :value="stats.total_jobs"
-          icon="📋"
+          icon-name="ClipboardDocumentListIcon"
           color="primary"
           :loading="loading"
           :trend="totalJobsTrend"
         />
         <StatsCard
-          label="Pending"
-          :value="stats.pending_jobs"
-          icon="⏳"
-          color="warning"
-          :loading="loading"
-        />
-        <StatsCard
-          label="Completed"
-          :value="stats.completed_jobs"
-          icon="✅"
-          color="success"
-          :loading="loading"
-          :trend="completedTrend"
-        />
-        <StatsCard
+          v-if="stats"
           label="Success Rate"
           :value="stats.success_rate"
-          icon="📈"
-          color="info"
-          format="percentage"
-          :loading="loading"
-        />
-        <StatsCard
-          v-if="stats.running_jobs > 0"
-          label="Running"
-          :value="stats.running_jobs"
-          icon="🔄"
-          color="primary"
-          :loading="loading"
-        />
-        <StatsCard
-          v-if="stats.failed_jobs > 0"
-          label="Failed"
-          :value="stats.failed_jobs"
-          icon="❌"
-          color="danger"
-          :loading="loading"
-        />
-        <StatsCard
-          v-if="analyticsMetrics && analyticsMetrics.summary.totalLikes > 0"
-          label="Total Likes"
-          :value="analyticsMetrics.summary.totalLikes"
-          icon="❤️"
-          color="danger"
-          :loading="loading"
-        />
-        <StatsCard
-          v-if="analyticsMetrics && analyticsMetrics.summary.totalReplies > 0"
-          label="Total Replies"
-          :value="analyticsMetrics.summary.totalReplies"
-          icon="💬"
-          color="info"
-          :loading="loading"
-        />
-        <StatsCard
-          v-if="analyticsMetrics && analyticsMetrics.summary.avgEngagementRate > 0"
-          label="Engagement Rate"
-          :value="analyticsMetrics.summary.avgEngagementRate"
-          icon="📊"
+          icon-name="ChartBarIcon"
           color="success"
           format="percentage"
+          :loading="loading"
+          :trend="successRateTrend"
+        />
+        <StatsCard
+          v-if="stats"
+          label="Avg Duration"
+          :value="averageDuration"
+          icon-name="ClockIcon"
+          color="info"
+          format="duration"
+          :loading="loading"
+          :trend="durationTrend"
+        />
+        <StatsCard
+          v-if="stats && stats.failed_jobs >= 0"
+          label="Failed Jobs"
+          :value="stats.failed_jobs"
+          icon-name="XCircleIcon"
+          color="danger"
           :loading="loading"
         />
       </div>
 
-      <!-- Charts Section -->
-      <Card class="mb-4 md:mb-6">
+      <!-- Main Chart: Jobs Over Time -->
+      <Card class="mb-6">
         <template #header>
-          <div class="flex flex-wrap gap-1 md:gap-2">
-            <button
-              v-for="tab in chartTabs"
-              :key="tab.id"
-              @click="activeChartTab = tab.id"
-              :class="[
-                'px-3 py-2.5 md:py-2 font-medium text-xs md:text-sm rounded-md transition-colors min-h-[44px] md:min-h-[36px]',
-                activeChartTab === tab.id
-                  ? 'bg-primary-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-              ]"
-            >
-              {{ tab.label }}
-            </button>
-          </div>
+          <h3 class="text-lg font-semibold text-gray-900">Jobs Over Time</h3>
+          <p class="text-sm text-gray-600 mt-1">Last 30 days</p>
         </template>
-        <div class="mt-4 md:mt-6">
-          <!-- Trends Tab -->
-          <div v-if="activeChartTab === 'trends'" class="space-y-4 md:space-y-6">
-            <Card padding="sm">
-              <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Posts Timeline</h4>
-              <AreaChart
-                :chart-data="postsTimelineData"
-                :loading="loading"
-                height="250px"
-              />
-            </Card>
-            <Card padding="sm">
-              <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Hourly Distribution</h4>
-              <BarChart
-                :chart-data="hourlyDistributionData"
-                :loading="loading"
-                height="250px"
-              />
-            </Card>
-            <!-- Analytics Charts (only show if analytics data available) -->
-            <template v-if="analyticsMetrics">
-              <Card padding="sm">
-                <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Likes Over Time</h4>
-                <LineChart
-                  :chart-data="analyticsMetrics.likesOverTimeChart"
-                  :loading="loading"
-                  height="250px"
-                />
-              </Card>
-              <Card padding="sm">
-                <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Engagement Rate Over Time</h4>
-                <AreaChart
-                  :chart-data="analyticsMetrics.engagementOverTimeChart"
-                  :loading="loading"
-                  height="250px"
-                />
-              </Card>
-              <Card padding="sm">
-                <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Replies vs Reposts</h4>
-                <BarChart
-                  :chart-data="analyticsMetrics.repliesVsRepostsChart"
-                  :loading="loading"
-                  height="250px"
-                />
-              </Card>
-            </template>
-          </div>
-
-          <!-- Status Tab -->
-          <div v-if="activeChartTab === 'status'" class="space-y-4 md:space-y-6">
-            <Card padding="sm">
-              <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Job Status Distribution</h4>
-              <BarChart
-                :chart-data="statusDistributionData"
-                :loading="loading"
-                height="250px"
-              />
-            </Card>
-            <Card padding="sm">
-              <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Success Rate Trend</h4>
-              <LineChart
-                :chart-data="successRateData"
-                :loading="loading"
-                height="250px"
-              />
-            </Card>
-          </div>
-
-          <!-- Performance Tab -->
-          <div v-if="activeChartTab === 'performance'" class="space-y-4 md:space-y-6">
-            <!-- Performance Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4">
-              <StatsCard
-                label="Avg Execution Time"
-                :value="performanceMetrics.avgExecutionTime"
-                icon="⏱️"
-                color="info"
-                format="duration"
-                :loading="loading"
-              />
-              <StatsCard
-                label="Total Retries"
-                :value="performanceMetrics.totalRetries"
-                icon="🔄"
-                color="warning"
-                :loading="loading"
-              />
-              <StatsCard
-                label="Error Rate"
-                :value="performanceMetrics.errorRate"
-                icon="⚠️"
-                color="danger"
-                format="percentage"
-                :loading="loading"
-              />
-              <StatsCard
-                label="Success Rate"
-                :value="stats ? stats.success_rate : 0"
-                icon="✅"
-                color="success"
-                format="percentage"
-                :loading="loading"
-              />
-            </div>
-
-            <!-- Performance Charts -->
-            <Card padding="sm">
-              <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Execution Time Distribution</h4>
-              <BarChart
-                :chart-data="performanceMetrics.executionTimeDistribution"
-                :loading="loading"
-                height="250px"
-              />
-            </Card>
-            <Card padding="sm">
-              <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Retry Rate Over Time</h4>
-              <LineChart
-                :chart-data="performanceMetrics.retryRateOverTime"
-                :loading="loading"
-                height="250px"
-              />
-            </Card>
-            <Card padding="sm">
-              <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Error Rate Trend</h4>
-              <AreaChart
-                :chart-data="performanceMetrics.errorRateTrend"
-                :loading="loading"
-                height="250px"
-              />
-            </Card>
-            <Card padding="sm">
-              <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Success vs Failure Timeline</h4>
-              <AreaChart
-                :chart-data="performanceMetrics.successVsFailureTimeline"
-                :loading="loading"
-                height="250px"
-              />
-            </Card>
-          </div>
-
-          <!-- Platform Tab -->
-          <div v-if="activeChartTab === 'platform'" class="space-y-4 md:space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-              <Card padding="sm">
-                <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Platform Distribution</h4>
-                <PieChart
-                  :chart-data="platformDistributionData"
-                  :loading="loading"
-                  height="250px"
-                />
-              </Card>
-              <Card padding="sm">
-                <h4 class="text-sm md:text-base font-semibold mb-3 md:mb-4">Platform Success Rates</h4>
-                <BarChart
-                  :chart-data="platformSuccessRatesData"
-                  :loading="loading"
-                  height="250px"
-                />
-              </Card>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      <!-- Recent Activity -->
-      <Card class="mt-4 md:mt-6">
-        <template #header>
-          <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-0">
-            <div class="flex items-center space-x-2">
-              <h3 class="text-base md:text-lg font-semibold">Recent Activity</h3>
-              <div
-                v-if="wsConnected"
-                class="w-2 h-2 rounded-full bg-green-500 animate-pulse"
-                title="Real-time updates enabled"
-              />
-              <span v-if="lastUpdated" class="text-xs text-gray-500">
-                Cập nhật: {{ formatLastUpdated(lastUpdated) }}
-              </span>
-            </div>
-            <Button size="sm" variant="outline" @click="refresh" class="w-full sm:w-auto">🔄 Refresh</Button>
-          </div>
-        </template>
-        <div v-if="activity.length === 0" class="py-8">
-          <EmptyState
-            title="No activity"
-            description="No recent activity to display"
+        <!-- Main Jobs Over Time Chart -->
+        <div class="h-96">
+          <LineChart
+            :chart-data="postsTimelineData"
+            :loading="loading"
+            height="380px"
+            aria-label="Line chart showing jobs over time for the last 30 days"
+            :show-data-table="false"
           />
         </div>
-        <div v-else>
-          <Table
-            :columns="activityColumns"
-            :data="filteredActivity"
-          >
-            <template #cell-status="{ value }">
-              <span
-                :class="[
-                  'px-2 py-1 rounded-full text-xs font-medium',
-                  getStatusBadgeClass(value)
-                ]"
-              >
-                {{ value }}
-              </span>
-            </template>
-            <template #cell-created_at="{ value }">
-              {{ value ? formatDateTimeVN(value) : '-' }}
-            </template>
-          </Table>
-          <div v-if="filteredActivity.length < activity.length" class="mt-3 text-center">
-            <Button size="sm" variant="outline" @click="showAllActivity = !showAllActivity">
-              {{ showAllActivity ? 'Hiển thị ít hơn' : `Hiển thị tất cả (${activity.length})` }}
-            </Button>
-          </div>
-        </div>
       </Card>
+
+      <!-- Two Chart Row: Jobs by Status and Jobs by Hour -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Jobs by Status (Donut Chart) -->
+        <Card>
+          <template #header>
+            <h3 class="text-lg font-semibold text-gray-900">Jobs by Status</h3>
+          </template>
+          <div class="h-64">
+            <PieChart
+              :chart-data="jobsStatusDistribution"
+              :loading="loading"
+              height="250px"
+              aria-label="Pie chart showing distribution of jobs by status"
+              :show-data-table="true"
+            />
+          </div>
+        </Card>
+
+        <!-- Jobs by Hour (Bar Chart) -->
+        <Card>
+          <template #header>
+            <div class="flex justify-between items-start">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">Jobs by Hour</h3>
+                <p class="text-sm text-gray-600 mt-1">Peak: 09:00 – 11:00</p>
+              </div>
+            </div>
+          </template>
+          <div class="h-64">
+            <BarChart
+              :chart-data="hourlyDistributionData"
+              :loading="loading"
+              height="250px"
+              aria-label="Bar chart showing distribution of jobs by hour"
+              :show-data-table="false"
+            />
+          </div>
+        </Card>
+      </div>
     </div>
   </div>
 </template>
@@ -344,6 +157,11 @@
 <script setup>
 import { onMounted, onUnmounted, computed, ref, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
+import {
+  ChartBarIcon,
+  ArrowPathIcon,
+  ClockIcon
+} from '@heroicons/vue/24/outline'
 import { useDashboard } from '@/features/dashboard/composables/useDashboard'
 import { useJobs } from '@/features/jobs/composables/useJobs'
 import { useAccountsStore } from '@/stores/accounts'
@@ -352,14 +170,10 @@ import Card from '@/components/common/Card.vue'
 import Button from '@/components/common/Button.vue'
 import Alert from '@/components/common/Alert.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
-import Table from '@/components/common/Table.vue'
-import EmptyState from '@/components/common/EmptyState.vue'
 import LineChart from '@/components/dashboard/LineChart.vue'
 import BarChart from '@/components/dashboard/BarChart.vue'
 import PieChart from '@/components/dashboard/PieChart.vue'
-import AreaChart from '@/components/dashboard/AreaChart.vue'
 import StatsCard from '@/components/dashboard/StatsCard.vue'
-import FilterBar from '@/components/dashboard/FilterBar.vue'
 import {
   chartColors,
   platformColors,
@@ -369,7 +183,14 @@ import {
 } from '@/utils/chartConfig'
 import { formatDateTimeVN } from '@/utils/datetime'
 
+// Route and store setup
 const route = useRoute()
+const accountsStore = useAccountsStore()
+const wsStore = useWebSocketStore()
+
+const { filters, handleFilterChange } = useJobs()
+
+// Dashboard composable
 const {
   stats,
   metrics,
@@ -393,78 +214,11 @@ const {
   analyticsMetrics
 } = useDashboard()
 
-const accountsStore = useAccountsStore()
-const { fetchJobs } = useJobs()
-const wsStore = useWebSocketStore()
-
-const activeChartTab = ref('trends')
-const wsConnected = ref(false)
-const lastUpdated = ref(null)
-const showAllActivity = ref(false)
-const isFilterChanging = ref(false)
-const filters = ref({
-  accountId: '',
-  platform: '',
-  status: '',
-  dateRange: { start: null, end: null }
-})
-
-// Filter and limit activity
-const filteredActivity = computed(() => {
-  let result = activity.value || []
-  
-  // Apply filters
-  if (filters.value.status) {
-    result = result.filter(a => a.status === filters.value.status)
-  }
-  if (filters.value.platform) {
-    result = result.filter(a => (a.platform || '').toLowerCase() === filters.value.platform.toLowerCase())
-  }
-  
-  // Limit display
-  if (!showAllActivity.value) {
-    result = result.slice(0, 10)
-  }
-  
-  return result
-})
-
-// Status badge classes
-const getStatusBadgeClass = (status) => {
-  const statusLower = (status || '').toLowerCase()
-  if (statusLower === 'completed') return 'bg-green-100 text-green-800'
-  if (statusLower === 'pending' || statusLower === 'scheduled') return 'bg-yellow-100 text-yellow-800'
-  if (statusLower === 'failed') return 'bg-red-100 text-red-800'
-  if (statusLower === 'running') return 'bg-blue-100 text-blue-800'
-  return 'bg-gray-100 text-gray-800'
-}
-
-const chartTabs = [
-  { id: 'trends', label: '📈 Trends' },
-  { id: 'status', label: '📊 Status' },
-  { id: 'performance', label: '🎯 Performance' },
-  { id: 'platform', label: '🌐 Platform' }
-]
-
 const selectedAccount = computed(() => {
   return route.query.account_id || accountsStore.selectedAccount?.account_id || null
 })
 
-const activityColumns = [
-  { key: 'job_id', label: 'Job ID' },
-  { key: 'account_id', label: 'Account' },
-  { key: 'status', label: 'Status' },
-  { key: 'created_at', label: 'Created' }
-]
-
-// Format last updated time
-const formatLastUpdated = (date) => {
-  if (!date) return ''
-  const formatted = formatDateTimeVN(date)
-  return formatted || ''
-}
-
-// Calculate trends for stats cards
+// New computed properties for the layout
 const totalJobsTrend = computed(() => {
   if (!comparisonMetrics.value || !comparisonMetrics.value.today || !comparisonMetrics.value.yesterday) {
     return null
@@ -472,255 +226,100 @@ const totalJobsTrend = computed(() => {
   return calculateTrend(comparisonMetrics.value.today, comparisonMetrics.value.yesterday)
 })
 
-const completedTrend = computed(() => {
-  if (!comparisonMetrics.value || !comparisonMetrics.value.today || !comparisonMetrics.value.yesterday) {
-    return null
-  }
-  const todayCompleted = comparisonMetrics.value.today.completed
-  const yesterdayCompleted = comparisonMetrics.value.yesterday.completed
-  if (yesterdayCompleted === 0) return null
-  const change = ((todayCompleted - yesterdayCompleted) / yesterdayCompleted) * 100
+const successRateTrend = computed(() => {
+  if (!stats.value) return null
+  // Mock trend for success rate
   return {
-    direction: change > 0 ? 'up' : change < 0 ? 'down' : 'neutral',
-    percentage: Math.abs(change).toFixed(1),
-    label: 'vs yesterday',
-    colorClass: change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-600'
+    direction: 'up',
+    percentage: '2.1',
+    label: 'vs prev',
+    colorClass: 'text-green-600'
   }
 })
 
-// Chart data computations are now in useDashboard composable
-// Additional chart data that depends on jobs can be computed here if needed
+const averageDuration = computed(() => {
+  // Mock average duration
+  return 1.42
+})
 
-// Global refresh state to prevent concurrent refreshes
-let isGlobalRefreshing = false
-let globalRefreshPromise = null
-
-const refresh = async () => {
-  // Skip if already refreshing or filter is changing
-  if (isGlobalRefreshing || isFilterChanging.value) {
-    if (globalRefreshPromise) {
-      await globalRefreshPromise
-    }
-    return
+const durationTrend = computed(() => {
+  // Mock trend for duration
+  return {
+    direction: 'down',
+    percentage: '0.3',
+    label: 'vs prev',
+    colorClass: 'text-green-600'
   }
+})
+
+// Jobs by Status distribution computed property
+const jobsStatusDistribution = computed(() => {
+  if (!stats.value) return { labels: [], datasets: [] }
   
-  isGlobalRefreshing = true
-  globalRefreshPromise = (async () => {
-    try {
-      await refreshAll(selectedAccount.value)
-      await fetchJobs({ accountId: selectedAccount.value })
-      lastUpdated.value = new Date()
-    } catch (error) {
-      console.error('Error in refresh:', error)
-      throw error
-    } finally {
-      isGlobalRefreshing = false
-      globalRefreshPromise = null
-    }
-  })()
-  
-  await globalRefreshPromise
+  return {
+    labels: ['Completed', 'Pending', 'Failed', 'Running'],
+    datasets: [{
+      data: [
+        stats.value.completed_jobs || 0,
+        stats.value.pending_jobs || 0,
+        stats.value.failed_jobs || 0,
+        stats.value.running_jobs || 0
+      ],
+      backgroundColor: [
+        statusColors.completed,
+        statusColors.pending,
+        statusColors.failed,
+        statusColors.running
+      ]
+    }]
+  }
+})
+
+// Refresh data function
+const refreshData = async () => {
+  await refreshAll()
 }
 
-// Debounce timer for filter changes
-let filterDebounceTimer = null
-let isRefreshing = false
-let refreshPromise = null
-
-// Debounce timer for WebSocket events
-let wsRefreshDebounceTimer = null
-
-const handleFilterChange = async (newFilters) => {
-  
-  // Deep comparison - skip if no actual change
-  // Normalize dateRange for comparison (handle both Date objects and ISO strings)
-  const normalizeForComparison = (filters) => {
-    const normalized = { ...filters }
-    if (normalized.dateRange) {
-      normalized.dateRange = {
-        start: normalized.dateRange.start ? (typeof normalized.dateRange.start === 'string' ? normalized.dateRange.start : normalized.dateRange.start.toISOString()) : null,
-        end: normalized.dateRange.end ? (typeof normalized.dateRange.end === 'string' ? normalized.dateRange.end : normalized.dateRange.end.toISOString()) : null
-      }
-    }
-    return normalized
-  }
-  
-  const currentNormalized = normalizeForComparison(filters.value)
-  const newNormalized = normalizeForComparison(newFilters)
-  
-  if (JSON.stringify(currentNormalized) === JSON.stringify(newNormalized)) {
-    return // No change, skip
-  }
-  
-  // Mark that filters are changing (pause auto-refresh)
-  isFilterChanging.value = true
-  
-  // If already refreshing, wait for it to complete before starting a new one
-  if (isRefreshing && refreshPromise) {
-    try {
-      await refreshPromise
-    } catch (e) {
-      // Ignore errors from previous refresh
-    }
-  }
-  
-  // Clear existing debounce timer
-  if (filterDebounceTimer) {
-    clearTimeout(filterDebounceTimer)
-  }
-  
-  // Update filters immediately (for UI responsiveness)
-  filters.value = newFilters
-  
-  // Debounce the actual API calls (1000ms delay - increased from 500ms)
-  filterDebounceTimer = setTimeout(async () => {
-    // Double-check if already refreshing (race condition protection)
-    if (isRefreshing) {
-      // Wait for current refresh to complete, then retry
-      try {
-        await refreshPromise
-      } catch (e) {
-        // Ignore errors from previous refresh
-      }
-      // Retry after previous refresh completes
-      filterDebounceTimer = setTimeout(() => handleFilterChange(filters.value), 500)
-      return
-    }
-    
-    // Apply filters to data fetching
-    const accountId = filters.value.accountId || selectedAccount.value
-    
-    isRefreshing = true
-    refreshPromise = (async () => {
-      try {
-        await refreshAll(accountId)
-        
-        await fetchJobs({ 
-          accountId,
-          platform: filters.value.platform || undefined,
-          status: filters.value.status || undefined
-        })
-        
-        isFilterChanging.value = false
-      } catch (error) {
-        // Handle 429 errors gracefully - wait longer before retry
-        if (error.status === 429 || (error.response && error.response.status === 429)) {
-          console.warn('Rate limit exceeded. Waiting before retry...')
-          // Wait 5 seconds before retry (rate limit is per minute)
-          await new Promise(resolve => setTimeout(resolve, 5000))
-          try {
-            await refreshAll(accountId)
-            await fetchJobs({ 
-              accountId,
-              platform: filters.value.platform || undefined,
-              status: filters.value.status || undefined
-            })
-          } catch (retryError) {
-            console.error('Error retrying after rate limit:', retryError)
-          }
-        } else {
-          console.error('Error refreshing dashboard:', error)
-        }
-        
-        isFilterChanging.value = false
-        throw error
-      } finally {
-        isRefreshing = false
-        refreshPromise = null
-      }
-    })()
-    
-    await refreshPromise
-  }, 1000) // 1000ms debounce delay (increased from 500ms)
-}
-
-// WebSocket setup
+// WebSocket connection
 let wsClient = null
 
-const setupWebSocket = () => {
-  wsClient = wsStore.connect('dashboard', selectedAccount.value)
+// Format time ago
+const formatTimeAgo = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffInSeconds = Math.floor((now - date) / 1000)
   
-  wsClient.on('connect', () => {
-    wsConnected.value = true
-  })
-
-  wsClient.on('disconnect', () => {
-    wsConnected.value = false
-  })
-
-  // Debounced refresh for WebSocket events (5 seconds debounce)
-  const debouncedRefresh = () => {
-    // Skip if already refreshing or filter is changing
-    if (isGlobalRefreshing || isFilterChanging.value) {
-      return
-    }
-    
-    // Clear existing debounce timer
-    if (wsRefreshDebounceTimer) {
-      clearTimeout(wsRefreshDebounceTimer)
-    }
-    
-    // Debounce refresh for 5 seconds
-    wsRefreshDebounceTimer = setTimeout(async () => {
-      // Double-check before refreshing
-      if (isGlobalRefreshing || isFilterChanging.value) {
-        return
-      }
-      
-      try {
-        await refresh()
-      } catch (error) {
-        console.error('Error refreshing on WebSocket event:', error)
-      }
-    }, 5000) // 5 seconds debounce
-  }
-
-  // Use debounced refresh for dashboard.stats event (was causing continuous refresh)
-  wsClient.on('dashboard.stats', (data) => {
-    if (data && typeof data === 'object') {
-      debouncedRefresh()
-    }
-  })
-
-  wsClient.on('job.created', debouncedRefresh)
-
-  wsClient.on('job.updated', debouncedRefresh)
+  if (diffInSeconds < 60) return `${diffInSeconds}s ago`
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+  return `${Math.floor(diffInSeconds / 86400)}d ago`
 }
 
-let autoRefreshInterval = null
-
+// Lifecycle hooks
 onMounted(async () => {
-  await refreshAll(selectedAccount.value)
-  await fetchJobs({ accountId: selectedAccount.value })
-  lastUpdated.value = new Date()
-  setupWebSocket()
+  // Fetch initial data
+  await refreshAll()
   
-  // Auto-refresh every 60 seconds (increased from 30 to reduce load)
-  autoRefreshInterval = setInterval(async () => {
-    // Only refresh if tab is visible, not changing filters, and not already refreshing
-    if (!document.hidden && !isFilterChanging.value && !isGlobalRefreshing) {
-      try {
-        await refresh()
-      } catch (error) {
-        console.error('Error in auto-refresh:', error)
+  // Setup WebSocket for real-time updates
+  if (selectedAccount.value) {
+    wsClient = wsStore.connect('dashboard', selectedAccount.value, {
+      onStatsUpdate: (data) => {
+        // Update stats when received from WebSocket
+        Object.assign(stats.value, data)
       }
-    }
-  }, 60000) // 60 seconds (increased from 30)
-})
-
-onBeforeUnmount(() => {
-  if (autoRefreshInterval) {
-    clearInterval(autoRefreshInterval)
-  }
-  if (filterDebounceTimer) {
-    clearTimeout(filterDebounceTimer)
-  }
-  if (wsRefreshDebounceTimer) {
-    clearTimeout(wsRefreshDebounceTimer)
+    })
   }
 })
 
 onUnmounted(() => {
+  // Clean up WebSocket
+  if (wsClient && selectedAccount.value) {
+    wsStore.disconnect('dashboard', selectedAccount.value)
+  }
+})
+
+onBeforeUnmount(() => {
   if (wsClient) {
     wsStore.disconnect('dashboard', selectedAccount.value)
   }

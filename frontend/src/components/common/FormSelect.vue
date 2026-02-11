@@ -9,6 +9,8 @@
       :value="modelValue"
       :disabled="disabled"
       :required="required"
+      :aria-invalid="error ? 'true' : 'false'"
+      :aria-describedby="error ? `${id}-error` : hint ? `${id}-hint` : undefined"
       :class="selectClasses"
       @change="handleChange($event)"
     >
@@ -21,8 +23,21 @@
         {{ option.label }}
       </option>
     </select>
-    <p v-if="error" class="mt-1 text-xs md:text-sm text-red-600">{{ error }}</p>
-    <p v-if="hint && !error" class="mt-1 text-xs md:text-sm text-gray-500">{{ hint }}</p>
+    <p 
+      v-if="error" 
+      :id="`${id}-error`"
+      role="alert"
+      class="mt-1 text-xs md:text-sm text-red-600"
+    >
+      {{ error }}
+    </p>
+    <p 
+      v-if="hint && !error" 
+      :id="`${id}-hint`"
+      class="mt-1 text-xs md:text-sm text-gray-500"
+    >
+      {{ hint }}
+    </p>
   </div>
 </template>
 
@@ -99,7 +114,7 @@ const selectClasses = computed(() => {
     lg: 'px-4 md:px-4 lg:px-4 py-3 md:py-2.5 lg:py-2.5 text-base md:text-base lg:text-lg min-h-[48px] md:min-h-[44px] lg:min-h-[40px]'
   }
   
-  const base = 'block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors bg-white'
+  const base = 'block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 transition-all duration-200 outline-none bg-white cursor-pointer'
   const sizeClass = sizes[props.size] || sizes.md
   const errorClass = props.error ? 'border-red-300 text-red-900 focus:border-red-500 focus:ring-red-500' : ''
   const disabledClass = props.disabled ? 'bg-gray-50 cursor-not-allowed' : ''

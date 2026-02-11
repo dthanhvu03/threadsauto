@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Python
 __pycache__/
 *.py[cod]
@@ -8,81 +7,51 @@ __pycache__/
 venv/
 env/
 ENV/
-.venv
+.venv/
+.env
+.env.*
 
-# Frontend
-frontend/node_modules/
+# Node / Frontend
+node_modules/
+**/node_modules/
+dist/
+.vite/
 frontend/dist/
 frontend/.vite/
 
-# Backend
-backend/__pycache__/
-backend/.env
-
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+*.iml
 
 # Logs
 *.log
 logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+
+# Project specific
+uploads/
+profiles/
+jobs/*.json
+!jobs/.keep
+.cursor/
+.mypy_cache/
+.pytest_cache/
+.bandit
+bandit-report.json
 
 # Build
 build/
-dist/
 
-# Environment
-.env
-.env.local
-
-# Uploads
-uploads/
-*.xlsx
-*.xls
-
-# Data directories (runtime-only, not in repository)
-backups/
-uploadexcel/
-profiles/
-jobs/
-
-# Documentation (keep only README.md)
-*.md
-!README.md
-
-# Shell scripts
-*.sh
-
-# Test files
-test_*.py
-*_test.py
-tests/
-backend/tests/
-scripts/test/
-=======
-# Build and Release Folders
-bin-debug/
-bin-release/
-[Oo]bj/
-[Bb]in/
-
-# Other files and folders
-.settings/
-
-# Executables
-*.swf
-*.air
-*.ipa
-*.apk
-
-# Project files, i.e. `.project`, `.actionScriptProperties` and `.flexProperties`
-# should NOT be excluded as they contain compiler settings and other important
-# information for Eclipse / Flash Builder.
->>>>>>> b83771d7584c169a13409047f2c8a5c38e302b93
+# Do not ignore docs or scripts unless necessary
+# We keep setup.sh and README.md
+# We keep tests/ if they are proper tests

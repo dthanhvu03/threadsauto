@@ -161,7 +161,7 @@ class JobsAPI:
     
     def add_job(
         self,
-        account_id: str,
+        account_id: Optional[str],
         content: str,
         scheduled_time: str,
         priority: str = "NORMAL",
@@ -222,7 +222,7 @@ class JobsAPI:
     
     def _validate_add_job_inputs(
         self,
-        account_id: str,
+        account_id: Optional[str],
         content: str,
         scheduled_time: str
     ) -> None:
@@ -230,15 +230,18 @@ class JobsAPI:
         Validate add_job inputs.
         
         Args:
-            account_id: Account ID
+            account_id: Account ID (optional, can be None or empty)
             content: Content string
             scheduled_time: Scheduled time string
         
         Raises:
             ValueError: If validation fails
         """
-        if not account_id or not isinstance(account_id, str):
-            raise ValueError("account_id must be a non-empty string")
+        # account_id is optional - allow None or empty string
+        if account_id is not None and account_id != "":
+            if not isinstance(account_id, str):
+                raise ValueError("account_id must be a string")
+        
         if not content or not isinstance(content, str):
             raise ValueError("content must be a non-empty string")
         if not scheduled_time or not isinstance(scheduled_time, str):
@@ -306,17 +309,21 @@ class JobsAPI:
                 f"Invalid platform: {platform}. Valid platforms: {', '.join(valid_platforms)}"
             ) from None
     
-    def _check_safety_guard(self, account_id: str, content: str) -> None:
+    def _check_safety_guard(self, account_id: Optional[str], content: str) -> None:
         """
         Check safety guard if available.
         
         Args:
-            account_id: Account ID
+            account_id: Account ID (optional, can be None)
             content: Content string
         
         Raises:
             ValueError: If safety check fails
         """
+        # Skip safety check if account_id is None
+        if account_id is None or account_id == "":
+            return
+        
         try:
             from backend.api.adapters.safety_adapter import SafetyAPI
             safety_api = SafetyAPI()
@@ -356,7 +363,7 @@ class JobsAPI:
     def _add_job_to_scheduler(
         self,
         target_scheduler,
-        account_id: str,
+        account_id: Optional[str],
         content: str,
         scheduled_time: datetime,
         priority: JobPriority,
@@ -368,7 +375,7 @@ class JobsAPI:
         
         Args:
             target_scheduler: Scheduler instance
-            account_id: Account ID
+            account_id: Account ID (optional, can be None)
             content: Content string
             scheduled_time: Scheduled datetime
             priority: JobPriority enum

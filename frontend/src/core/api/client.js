@@ -66,14 +66,17 @@ export function createApiClient(baseURL = '/api') {
       if (responseData && responseData.success === true) {
         const data = responseData.data
         
-        // If data is an array and we have pagination, return an object with data and _pagination
-        // This ensures pagination metadata is preserved
-        if (Array.isArray(data) && responseData.pagination) {
-          return {
-            data: data,
-            _pagination: responseData.pagination,
-            _meta: responseData.meta || null
+        // If data is an array, preserve metadata (pagination or meta)
+        if (Array.isArray(data)) {
+          if (responseData.pagination || responseData.meta) {
+            return {
+              data: data,
+              _pagination: responseData.pagination || null,
+              _meta: responseData.meta || null
+            }
           }
+          // For arrays without metadata, return as-is
+          return data
         }
         
         // For non-array data, attach properties directly
@@ -87,7 +90,7 @@ export function createApiClient(baseURL = '/api') {
           return data
         }
         
-        // For primitive data or arrays without pagination, return as-is
+        // For primitive data, return as-is
         return data
       }
       
@@ -120,10 +123,21 @@ export function createApiClient(baseURL = '/api') {
         )
       } else if (error.request) {
         // Request made but no response
+        const errorMessage = error.code === 'ECONNREFUSED' 
+          ? 'Cannot connect to backend API. Please ensure the backend server is running.'
+          : error.message || 'Network error. Please check your connection.'
         throw new ApiError(
           ErrorCodes.INTERNAL_ERROR,
-          'Network error. Please check your connection.',
-          {},
+          errorMessage,
+          {
+            code: error.code,
+            message: error.message,
+            config: {
+              url: error.config?.url,
+              baseURL: error.config?.baseURL,
+              method: error.config?.method
+            }
+          },
           0
         )
       } else {

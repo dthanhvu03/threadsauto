@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Load .env file
 try:
     from dotenv import load_dotenv
+
     env_path = Path(__file__).parent.parent / ".env"
     if env_path.exists():
         load_dotenv(env_path)
@@ -36,12 +37,15 @@ from backend.api.routes import (
     excel,
     scheduler,
     config,
-    selectors
+    selectors,
 )
 from backend.api.websocket.routes import websocket_endpoint
 from backend.app.core.responses import success_response, error_response
 from backend.app.core.exceptions import APIException
-from backend.app.core.middleware import RequestLoggingMiddleware, RequestValidationMiddleware
+from backend.app.core.middleware import (
+    RequestLoggingMiddleware,
+    RequestValidationMiddleware,
+)
 from services.logger import StructuredLogger
 from utils.sanitize import sanitize_error
 
@@ -52,7 +56,7 @@ logger = StructuredLogger(name="fastapi_backend")
 app = FastAPI(
     title="Threads Automation API",
     description="REST API cho Threads Automation Tool",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # CORS configuration
@@ -74,6 +78,7 @@ app.add_middleware(RequestValidationMiddleware)
 
 # Rate limiting middleware (simple in-memory rate limiting)
 from backend.app.core.middleware import RateLimitMiddleware
+
 app.add_middleware(RateLimitMiddleware, requests_per_minute=100)
 
 # Request logging middleware
@@ -87,6 +92,7 @@ from backend.app.core.migration_flags import get_enabled_modules, is_module_enab
 # Jobs module (already migrated)
 try:
     from backend.app.modules.jobs.routes import router as jobs_module_router
+
     app.include_router(jobs_module_router, prefix="/api/jobs", tags=["jobs"])
 except ImportError as e:
     # Fallback to legacy routes if new module not available
@@ -94,7 +100,7 @@ except ImportError as e:
         step="ROUTER_SETUP",
         result="WARNING",
         error=f"Could not import new jobs module routes: {str(e)}, using legacy routes",
-        error_type=type(e).__name__
+        error_type=type(e).__name__,
     )
     app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 
@@ -105,20 +111,21 @@ except ImportError as e:
 if is_module_enabled("accounts"):
     try:
         from backend.app.modules.accounts.routes import router as accounts_module_router
+
         # Register new routes AFTER legacy routes so legacy routes take precedence
         # Legacy routes will use adapter pattern to call new controller
         logger.log_step(
             step="ROUTER_SETUP",
             result="INFO",
             note="New accounts module available (legacy routes will delegate to it)",
-            enabled_modules=list(get_enabled_modules())
+            enabled_modules=list(get_enabled_modules()),
         )
     except ImportError as e:
         logger.log_step(
             step="ROUTER_SETUP",
             result="WARNING",
             error=f"Could not import new accounts module routes: {str(e)}, using legacy routes only",
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
         )
 
 # Dashboard module (conditionally registered)
@@ -126,38 +133,60 @@ if is_module_enabled("accounts"):
 # so legacy routes take precedence (adapter pattern)
 if is_module_enabled("dashboard"):
     try:
-        from backend.app.modules.dashboard.routes import router as dashboard_module_router
+        from backend.app.modules.dashboard.routes import (
+            router as dashboard_module_router,
+        )
+
         logger.log_step(
             step="ROUTER_SETUP",
             result="INFO",
             note="New dashboard module available (legacy routes will delegate to it)",
-            enabled_modules=list(get_enabled_modules())
+            enabled_modules=list(get_enabled_modules()),
         )
     except ImportError as e:
         logger.log_step(
             step="ROUTER_SETUP",
             result="WARNING",
             error=f"Could not import new dashboard module routes: {str(e)}, using legacy routes only",
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
         )
+
+# Feed module (always registered - no condition needed)
+try:
+    from backend.app.modules.feed.routes import router as feed_router
+
+    app.include_router(feed_router, prefix="/api/feed", tags=["feed"])
+    logger.log_step(
+        step="ROUTER_SETUP", result="SUCCESS", note="Feed module routes registered"
+    )
+except ImportError as e:
+    logger.log_step(
+        step="ROUTER_SETUP",
+        result="WARNING",
+        error=f"Could not import feed module routes: {str(e)}",
+        error_type=type(e).__name__,
+    )
 
 # Scheduler module (conditionally registered)
 # CRITICAL: SchedulerService is the single source of truth for scheduler instance
 if is_module_enabled("scheduler"):
     try:
-        from backend.app.modules.scheduler.routes import router as scheduler_module_router
+        from backend.app.modules.scheduler.routes import (
+            router as scheduler_module_router,
+        )
+
         logger.log_step(
             step="ROUTER_SETUP",
             result="INFO",
             note="New scheduler module available (legacy routes will delegate to it)",
-            enabled_modules=list(get_enabled_modules())
+            enabled_modules=list(get_enabled_modules()),
         )
     except ImportError as e:
         logger.log_step(
             step="ROUTER_SETUP",
             result="WARNING",
             error=f"Could not import new scheduler module routes: {str(e)}, using legacy routes only",
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
         )
 
 # Legacy routes (kept for backward compatibility - will be removed)
@@ -169,18 +198,19 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"]
 if is_module_enabled("excel"):
     try:
         from backend.app.modules.excel.routes import router as excel_module_router
+
         logger.log_step(
             step="ROUTER_SETUP",
             result="INFO",
             note="New excel module available (legacy routes will delegate to it)",
-            enabled_modules=list(get_enabled_modules())
+            enabled_modules=list(get_enabled_modules()),
         )
     except ImportError as e:
         logger.log_step(
             step="ROUTER_SETUP",
             result="WARNING",
             error=f"Could not import new excel module routes: {str(e)}, using legacy routes only",
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
         )
 
 app.include_router(excel.router, prefix="/api/excel", tags=["excel"])
@@ -190,44 +220,51 @@ app.include_router(scheduler.router, prefix="/api/scheduler", tags=["scheduler"]
 if is_module_enabled("config"):
     try:
         from backend.app.modules.config.routes import router as config_module_router
+
         logger.log_step(
             step="ROUTER_SETUP",
             result="INFO",
             note="New config module available (legacy routes will delegate to it)",
-            enabled_modules=list(get_enabled_modules())
+            enabled_modules=list(get_enabled_modules()),
         )
     except ImportError as e:
         logger.log_step(
             step="ROUTER_SETUP",
             result="WARNING",
             error=f"Could not import new config module routes: {str(e)}, using legacy routes only",
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
         )
 
 # Selectors module (conditionally registered)
 if is_module_enabled("selectors"):
     try:
-        from backend.app.modules.selectors.routes import router as selectors_module_router
+        from backend.app.modules.selectors.routes import (
+            router as selectors_module_router,
+        )
+
         logger.log_step(
             step="ROUTER_SETUP",
             result="INFO",
             note="New selectors module available (legacy routes will delegate to it)",
-            enabled_modules=list(get_enabled_modules())
+            enabled_modules=list(get_enabled_modules()),
         )
     except ImportError as e:
         logger.log_step(
             step="ROUTER_SETUP",
             result="WARNING",
             error=f"Could not import new selectors module routes: {str(e)}, using legacy routes only",
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
         )
 
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(selectors.router, prefix="/api/selectors", tags=["selectors"])
 
+
 # WebSocket endpoint
 @app.websocket("/ws")
-async def websocket_route(websocket: WebSocket, room: str = "default", account_id: str = None):
+async def websocket_route(
+    websocket: WebSocket, room: str = "default", account_id: str = None
+):
     """WebSocket endpoint for real-time updates."""
     await websocket_endpoint(websocket, room=room, account_id=account_id)
 
@@ -236,20 +273,34 @@ async def websocket_route(websocket: WebSocket, room: str = "default", account_i
 @app.exception_handler(APIException)
 async def api_exception_handler(request: Request, exc: APIException):
     """Handle custom API exceptions."""
+    from backend.app.core.exceptions import TimeoutError
+    from backend.app.core.responses import timeout_error_response
+
     logger.log_step(
         step="API_EXCEPTION",
         result="ERROR",
         error_code=exc.error_code,
         error=exc.message,
         path=request.url.path,
-        method=request.method
+        method=request.method,
     )
+
+    # Special handling for timeout errors
+    if isinstance(exc, TimeoutError):
+        return timeout_error_response(
+            operation=exc.details.get("operation", "unknown"),
+            timeout=exc.details.get("timeout", 300000),
+            elapsed_time=exc.details.get("elapsedTime"),
+            request_id=getattr(request.state, "request_id", None),
+        )
+
+    # Standard error response (simple string format matching documentation)
     return error_response(
         error_code=exc.error_code,
         message=exc.message,
-        details=exc.details,
+        details=exc.details,  # For logging only, not included in response
         status_code=exc.status_code,
-        request_id=getattr(request.state, "request_id", None)
+        request_id=getattr(request.state, "request_id", None),
     )
 
 
@@ -261,9 +312,9 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         result="ERROR",
         error=f"{exc.status_code}: {exc.detail}",
         path=request.url.path,
-        method=request.method
+        method=request.method,
     )
-    
+
     # Map HTTP status codes to error codes
     error_code_map = {
         400: "BAD_REQUEST",
@@ -271,16 +322,17 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         403: "FORBIDDEN",
         404: "NOT_FOUND",
         409: "CONFLICT",
-        500: "INTERNAL_ERROR"
+        500: "INTERNAL_ERROR",
+        504: "TIMEOUT_ERROR",
     }
-    
+
     error_code = error_code_map.get(exc.status_code, "HTTP_ERROR")
-    
+
     return error_response(
         error_code=error_code,
         message=str(exc.detail),
         status_code=exc.status_code,
-        request_id=getattr(request.state, "request_id", None)
+        request_id=getattr(request.state, "request_id", None),
     )
 
 
@@ -292,14 +344,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         result="ERROR",
         error=str(exc.errors()),
         path=request.url.path,
-        method=request.method
+        method=request.method,
     )
     return error_response(
         error_code="VALIDATION_ERROR",
         message="Request validation failed",
         details={"errors": exc.errors()},
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        request_id=getattr(request.state, "request_id", None)
+        request_id=getattr(request.state, "request_id", None),
     )
 
 
@@ -307,7 +359,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def general_exception_handler(request: Request, exc: Exception):
     """
     Global exception handler - không expose thông tin nhạy cảm.
-    
+
     Log chi tiết vào file, nhưng chỉ trả về generic error message.
     """
     # Log chi tiết vào file (với sanitize)
@@ -317,14 +369,14 @@ async def general_exception_handler(request: Request, exc: Exception):
         error=sanitize_error(exc),
         error_type=type(exc).__name__,
         path=request.url.path,
-        method=request.method
+        method=request.method,
     )
     # Trả về generic error message (không expose stack trace hoặc error type)
     return error_response(
         error_code="INTERNAL_ERROR",
         message="An internal error occurred. Please try again later.",
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        request_id=getattr(request.state, "request_id", None)
+        request_id=getattr(request.state, "request_id", None),
     )
 
 
@@ -334,27 +386,77 @@ async def root():
     """Root endpoint."""
     return success_response(
         data={"message": "Threads Automation API", "version": "1.0.0"},
-        message="API is running"
+        message="API is running",
     )
 
 
 @app.get("/health")
 async def health():
     """Health check endpoint."""
-    return success_response(
-        data={"status": "healthy"},
-        message="API is healthy"
+    return success_response(data={"status": "healthy"}, message="API is healthy")
+
+
+# Startup event - Check Qrtools API connection
+@app.on_event("startup")
+async def startup_event():
+    """Check Qrtools API availability on startup."""
+    import httpx
+    import os
+
+    qrtools_url = os.getenv("QRTOOLS_API_URL", "http://localhost:3000/api")
+    health_url = f"{qrtools_url}/health"
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(health_url)
+            response.raise_for_status()
+            logger.log_step(
+                step="QRTOOLS_API_CHECK",
+                result="SUCCESS",
+                note=f"Qrtools API is available at {qrtools_url}",
+            )
+    except httpx.ConnectError:
+        logger.log_step(
+            step="QRTOOLS_API_CHECK",
+            result="WARNING",
+            error=f"Cannot connect to Qrtools API at {qrtools_url}",
+            note="Make sure Qrtools API server is running: cd qrtools && npm run api",
+        )
+    except Exception as e:
+        logger.log_step(
+            step="QRTOOLS_API_CHECK",
+            result="WARNING",
+            error=f"Error checking Qrtools API: {str(e)}",
+            note="Qrtools API may not be available",
+        )
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup resources on shutdown."""
+    logger.log_step(
+        step="SHUTDOWN", result="IN_PROGRESS", note="Cleaning up resources..."
     )
+
+    try:
+        from browser.manager import BrowserManager
+
+        await BrowserManager.close_all()
+        logger.log_step(
+            step="SHUTDOWN_BROWSER_CLEANUP",
+            result="SUCCESS",
+            note="Closed all active browsers",
+        )
+    except Exception as e:
+        logger.log_step(step="SHUTDOWN_BROWSER_CLEANUP", result="WARNING", error=str(e))
+
+    logger.log_step(step="SHUTDOWN", result="SUCCESS", note="Cleanup completed")
 
 
 if __name__ == "__main__":
     # Get port from environment variable or default to 8000
     port = int(os.getenv("PORT", "8000"))
-    
+
     uvicorn.run(
-        "backend.main:app",
-        host="0.0.0.0",
-        port=port,
-        reload=True,
-        log_level="info"
+        "backend.main:app", host="0.0.0.0", port=port, reload=True, log_level="info"
     )

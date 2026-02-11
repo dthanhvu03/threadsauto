@@ -1,0 +1,29 @@
+# Development dependencies for CI/CD and code quality
+
+# Code formatting
+black>=24.3.0
+
+# Linting
+pylint>=3.1.0
+
+# Type checking
+mypy>=1.9.0
+# Note: types-all is not compatible with Python 3.12
+# Using --ignore-missing-imports flag instead
+# Optional type stubs (install individually if needed):
+# types-requests>=2.31.0
+
+# Security scanning
+bandit>=1.7.6
+
+# Pre-commit hooks
+pre-commit>=3.6.0
+
+# Testing (if not already in requirements.txt)
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+pytest-xdist>=3.5.0
+
+# Coverage reporting
+coverage>=7.5.0

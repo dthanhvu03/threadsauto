@@ -207,3 +207,92 @@ export function formatChartLabel(date, includeTime = false) {
   if (!date) return ''
   return includeTime ? formatDateTimeVN(date) : formatDateVN(date)
 }
+
+/**
+ * Sample data for large datasets to improve performance.
+ * Uses simple downsampling to reduce data points while preserving trends.
+ * 
+ * @param {Array} data - Array of data points
+ * @param {number} maxPoints - Maximum number of points to return
+ * @returns {Array} Sampled data array
+ */
+export function sampleData(data, maxPoints = 100) {
+  if (!data || data.length <= maxPoints) {
+    return data
+  }
+
+  const step = Math.ceil(data.length / maxPoints)
+  const sampled = []
+  
+  for (let i = 0; i < data.length; i += step) {
+    sampled.push(data[i])
+  }
+  
+  // Always include the last point
+  if (sampled[sampled.length - 1] !== data[data.length - 1]) {
+    sampled.push(data[data.length - 1])
+  }
+  
+  return sampled
+}
+
+/**
+ * Sample time series data while preserving important points (min, max, start, end).
+ * 
+ * @param {Array} items - Array of items with date and value
+ * @param {string} dateKey - Key for date field
+ * @param {string} valueKey - Key for value field
+ * @param {number} maxPoints - Maximum number of points to return
+ * @returns {Array} Sampled items array
+ */
+export function sampleTimeSeries(items, dateKey = 'date', valueKey = 'value', maxPoints = 100) {
+  if (!items || items.length <= maxPoints) {
+    return items
+  }
+
+  // Find min and max values
+  let minIndex = 0
+  let maxIndex = 0
+  let minValue = items[0]?.[valueKey] ?? 0
+  let maxValue = items[0]?.[valueKey] ?? 0
+
+  for (let i = 1; i < items.length; i++) {
+    const value = items[i]?.[valueKey] ?? 0
+    if (value < minValue) {
+      minValue = value
+      minIndex = i
+    }
+    if (value > maxValue) {
+      maxValue = value
+      maxIndex = i
+    }
+  }
+
+  // Sample with step, but always include first, last, min, max
+  const step = Math.ceil(items.length / maxPoints)
+  const sampled = []
+  const includeIndices = new Set([0, items.length - 1, minIndex, maxIndex])
+
+  for (let i = 0; i < items.length; i += step) {
+    if (!includeIndices.has(i) || sampled.length < maxPoints) {
+      sampled.push(items[i])
+      includeIndices.delete(i)
+    }
+  }
+
+  // Add any remaining important points
+  includeIndices.forEach(index => {
+    if (!sampled.find(item => item === items[index])) {
+      sampled.push(items[index])
+    }
+  })
+
+  // Sort by date to maintain chronological order
+  sampled.sort((a, b) => {
+    const dateA = new Date(a[dateKey])
+    const dateB = new Date(b[dateKey])
+    return dateA - dateB
+  })
+
+  return sampled
+}
